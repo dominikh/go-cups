@@ -1,6 +1,9 @@
 package raster
 
-import "image/color"
+import (
+	"image/color"
+	"io"
+)
 
 func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 	// TODO support banded and planar
@@ -27,4 +30,31 @@ func (p *Page) parseColorsBlack(b []byte) []color.Color {
 		}
 	}
 	return colors
+}
+
+type ImageSetter interface {
+	Set(x, y int, c color.Color)
+}
+
+// Render renders a CUPS raster image onto any image.Image that
+// implements the Set method.
+func (p *Page) Render(img ImageSetter) error {
+	b := make([]byte, p.LineSize())
+	for y := uint32(0); y < p.Header.CUPSHeight; y++ {
+		err := p.ReadLine(b)
+		if err == io.EOF {
+			return io.ErrUnexpectedEOF
+		}
+		if err != nil {
+			return err
+		}
+		colors, err := p.ParseColors(b)
+		if err != nil {
+			return err
+		}
+		for x, color := range colors {
+			img.Set(x, int(y), color)
+		}
+	}
+	return nil
 }

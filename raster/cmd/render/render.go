@@ -4,7 +4,6 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	"io"
 	"log"
 	"os"
 
@@ -34,26 +33,10 @@ func main() {
 		Max: image.Point{X: int(p.Header.CUPSWidth), Y: int(p.Header.CUPSHeight)},
 	}, palette)
 
-	b := make([]byte, p.LineSize())
-	y := 0
-	for {
-		err := p.ReadLine(b)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-		colors, err := p.ParseColors(b)
-		if err != nil {
-			log.Fatal(err)
-		}
-		for x, color := range colors {
-			img.Set(x, y, color)
-		}
-		y++
+	err = p.Render(img)
+	if err != nil {
+		log.Fatal(err)
 	}
-
 	err = png.Encode(os.Stdout, img)
 	if err != nil {
 		log.Fatal(err)
