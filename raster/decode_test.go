@@ -1,12 +1,9 @@
 package raster
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 func open(s string, t *testing.T) *os.File {
@@ -31,13 +28,13 @@ func TestDecode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spew.Dump(p.Header)
+	//spew.Dump(p.Header)
 	b := make([]byte, p.TotalSize())
 	err = p.ReadAll(b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf("%s", b)
+	//fmt.Printf("%s", b)
 }
 
 func TestDecodeMultiplePages(t *testing.T) {
@@ -62,13 +59,61 @@ func TestDecodeMultiplePages(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		spew.Dump(p.Header)
+		//spew.Dump(p.Header)
 		b := make([]byte, p.TotalSize())
 		err = p.ReadAll(b)
 		if err != nil {
 			t.Fatal(err)
 		}
-		fmt.Printf("%s", b)
+		//fmt.Printf("%s", b)
+	}
+}
+
+func TestDecodeTruncatedLine(t *testing.T) {
+	f := open("testdata/raster_truncated", t)
+	defer f.Close()
+	d, err := NewDecoder(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := d.NextPage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, p.LineSize())
+	lines := p.TotalSize() / p.LineSize()
+	var i uint32
+	for i = 1; i <= lines; i++ {
+		err = p.ReadLine(b)
+		if err != nil {
+			break
+		}
+	}
+	const brokenLine = 236
+	if err != nil && i != brokenLine {
+		t.Errorf("got read error %q after %d iterations, expected %d iterations", err, i, brokenLine)
+	}
+	if err != io.ErrUnexpectedEOF {
+		t.Errorf("got %v, want io.ErrUnexpectedEOF", err)
+	}
+}
+
+func TestDecodeMissingLine(t *testing.T) {
+	t.Skip("TODO(dh): provide fixture")
+	f := open("testdata/raster_missing_line", t)
+	defer f.Close()
+	d, err := NewDecoder(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := d.NextPage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, p.TotalSize())
+	err = p.ReadAll(b)
+	if err != io.ErrUnexpectedEOF {
+		t.Errorf("got %v, want io.ErrUnexpectedEOF", err)
 	}
 }
 
@@ -81,6 +126,6 @@ func TestDecodeTruncatedHeader(t *testing.T) {
 	}
 	_, err = d.NextPage()
 	if err != io.ErrUnexpectedEOF {
-		t.Errorf("got %v, want io.ErrUnexpectedEOF", err)
+		t.Errorf("got %q, want io.ErrUnexpectedEOF", err)
 	}
 }

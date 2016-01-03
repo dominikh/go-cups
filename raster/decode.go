@@ -121,7 +121,7 @@ func (d *Decoder) NextPage() (*Page, error) {
 
 // ReadLine returns the next line of pixels in the image. The returned
 // slice will only be valid until the next call to ReadLine.
-func (p *Page) ReadLine(b []byte) error {
+func (p *Page) ReadLine(b []byte) (err error) {
 	if len(b) < cap(p.line) {
 		panic("buffer to Page.ReadLine is too small")
 	}
@@ -132,7 +132,7 @@ func (p *Page) ReadLine(b []byte) error {
 	}
 
 	var lineRep byte
-	err := binary.Read(p.dec.r, p.dec.bo, &lineRep)
+	err = binary.Read(p.dec.r, p.dec.bo, &lineRep)
 	if err != nil {
 		return err
 	}
@@ -140,6 +140,12 @@ func (p *Page) ReadLine(b []byte) error {
 	// the count is stored as count - 1, but we're already reading the
 	// first line, anyway.
 	p.lineRep = int(lineRep)
+
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
 
 	for len(p.line) < int(p.Header.CUPSBytesPerLine) {
 		var n byte
@@ -180,6 +186,9 @@ func (p *Page) ReadAll(b []byte) error {
 	}
 	for i := uint32(0); i < p.Header.CUPSHeight; i++ {
 		err := p.ReadLine(b[i*p.Header.CUPSBytesPerLine:])
+		if err == io.EOF {
+			return io.ErrUnexpectedEOF
+		}
 		if err != nil {
 			return err
 		}
