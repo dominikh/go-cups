@@ -1,8 +1,10 @@
 package raster
 
 import (
+	"image"
 	"image/color"
 	"io"
+	"io/ioutil"
 )
 
 func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
@@ -36,6 +38,9 @@ type ImageSetter interface {
 	Set(x, y int, c color.Color)
 }
 
+// TODO Instead of having a Render function, consider implementing an
+// image.Image based on the RLE byte data.
+
 // Render renders a CUPS raster image onto any image.Image that
 // implements the Set method.
 func (p *Page) Render(img ImageSetter) error {
@@ -57,4 +62,113 @@ func (p *Page) Render(img ImageSetter) error {
 		}
 	}
 	return nil
+}
+
+func (p *Page) Image() image.Image {
+	// FIXME this function is wrong in all ways imaginable
+	b, err := ioutil.ReadAll(p.dec.r)
+	if err != nil {
+		panic(err)
+	}
+	return &Image{p: p, data: b}
+}
+
+var _ image.Image = (*Image)(nil)
+
+type Image struct {
+	p    *Page
+	data []byte
+	// y -> (x -> offset)
+	ys map[int]map[int]int
+}
+
+func (img *Image) populateCache() {
+	img.ys = map[int]map[int]int{}
+	// TODO support other color spaces
+	y := 0
+	off := 0
+	// FIXME deal with error
+	bpc, err := bytesPerColor(img.p.Header)
+	_ = err
+	for off < len(img.data) {
+		rep := int(img.data[off]) + 1
+		m := map[int]int{}
+		for i := 0; i < rep; i++ {
+			img.ys[y+i] = m
+		}
+		y += rep
+		off++
+
+		x := 0
+		for uint32(x) < img.p.Header.CUPSWidth {
+			rep := int(img.data[off])
+			off++
+			if rep <= 127 {
+				// rep repeating colors
+				rep++
+				pixels := rep * ((bpc * 8) / int(img.p.Header.CUPSBitsPerPixel))
+				for i := 0; i < pixels; i++ {
+					m[x+i] = off
+				}
+				off += bpc
+			} else {
+				// rep non-repeating colors
+				rep = 257 - rep
+				ppb := ((bpc * 8) / int(img.p.Header.CUPSBitsPerPixel))
+				for i := 0; i < rep; i++ {
+					for j := 0; j < ppb; j++ {
+						m[x+i*ppb+j] = off + i*bpc
+					}
+				}
+				off += rep * bpc
+			}
+			pixels := rep * ((bpc * 8) / int(img.p.Header.CUPSBitsPerPixel))
+			x += pixels
+		}
+	}
+}
+
+func (img *Image) ColorModel() color.Model {
+	switch img.p.Header.CUPSColorSpace {
+	case ColorSpaceBlack:
+		return color.Palette{color.Gray{Y: 0}, color.Gray{Y: 255}}
+	default:
+		// TODO panic?
+		return nil
+	}
+}
+
+func (img *Image) Bounds() image.Rectangle {
+	return image.Rectangle{
+		Min: image.Point{},
+		Max: image.Point{
+			X: int(img.p.Header.CUPSWidth),
+			Y: int(img.p.Header.CUPSHeight),
+		},
+	}
+}
+
+func (img *Image) At(x, y int) color.Color {
+	if img.p.Header.CUPSColorSpace != ColorSpaceBlack {
+		// TODO support other color spaces
+		return nil
+	}
+	if int64(x) >= int64(img.p.Header.CUPSWidth) ||
+		int64(y) >= int64(img.p.Header.CUPSHeight) {
+		return nil
+	}
+	if img.ys == nil {
+		img.populateCache()
+	}
+
+	off, ok := img.ys[y][x]
+	if !ok {
+		panic("invalid RLE cache")
+	}
+	// FIXME don't assume monochrome color space
+	shift := uint(x % 8)
+	if img.data[off]<<shift&128 == 0 {
+		return color.Gray{Y: 255}
+	}
+	return color.Gray{Y: 0}
 }

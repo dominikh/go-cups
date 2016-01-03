@@ -1,8 +1,6 @@
 package main
 
 import (
-	"image"
-	"image/color"
 	"image/png"
 	"log"
 	"os"
@@ -27,16 +25,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	palette := color.Palette{color.Gray{Y: 255}, color.Gray{Y: 0}}
-	img := image.NewPaletted(image.Rectangle{
-		Min: image.Point{X: 0, Y: 0},
-		Max: image.Point{X: int(p.Header.CUPSWidth), Y: int(p.Header.CUPSHeight)},
-	}, palette)
+	// palette := color.Palette{color.Gray{Y: 255}, color.Gray{Y: 0}}
+	// img2 := image.NewPaletted(image.Rectangle{
+	// 	Min: image.Point{X: 0, Y: 0},
+	// 	Max: image.Point{X: int(p.Header.CUPSWidth), Y: int(p.Header.CUPSHeight)},
+	// }, palette)
 
-	err = p.Render(img)
-	if err != nil {
-		log.Fatal(err)
-	}
+	img := p.Image()
+	// img.(*raster.Image).Render2(img2)
+
+	// err = p.Render(img2)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 	err = png.Encode(os.Stdout, img)
 	if err != nil {
 		log.Fatal(err)
