@@ -9,6 +9,14 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
+func open(s string, t *testing.T) *os.File {
+	f, err := os.Open(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
 func TestDecode(t *testing.T) {
 	f, err := os.Open("testdata/raster")
 	if err != nil {
@@ -61,5 +69,18 @@ func TestDecodeMultiplePages(t *testing.T) {
 			t.Fatal(err)
 		}
 		fmt.Printf("%s", b)
+	}
+}
+
+func TestDecodeTruncatedHeader(t *testing.T) {
+	f := open("testdata/truncated_header", t)
+	defer f.Close()
+	d, err := NewDecoder(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = d.NextPage()
+	if err != io.ErrUnexpectedEOF {
+		t.Errorf("got %v, want io.ErrUnexpectedEOF", err)
 	}
 }

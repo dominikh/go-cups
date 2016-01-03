@@ -43,15 +43,26 @@ func parseMagic(b []byte) (version int, bo binary.ByteOrder, ok bool) {
 	}
 }
 
+type countingReader struct {
+	r io.Reader
+	n int
+}
+
+func (r *countingReader) Read(b []byte) (n int, err error) {
+	n, err = r.r.Read(b)
+	r.n += n
+	return n, err
+}
+
 type Decoder struct {
-	r       io.Reader
+	r       *countingReader
 	bo      binary.ByteOrder
 	err     error
 	version int
 }
 
 func NewDecoder(r io.Reader) (*Decoder, error) {
-	d := &Decoder{r: r}
+	d := &Decoder{r: &countingReader{r: r}}
 	magic := make([]byte, 4)
 	_, err := io.ReadFull(r, magic)
 	if err != nil {
@@ -79,6 +90,8 @@ func (d *Decoder) NextPage() (*Page, error) {
 	// TODO if the user didn't read all lines, skip over them
 	var err error
 	var h *PageHeader
+
+	n := d.r.n
 	switch d.version {
 	case 1:
 		h, err = d.decodeV1Header()
@@ -86,6 +99,9 @@ func (d *Decoder) NextPage() (*Page, error) {
 		h, err = d.decodeV2Header()
 	default:
 		return nil, ErrUnsupported
+	}
+	if err == io.EOF && d.r.n != n {
+		return nil, io.ErrUnexpectedEOF
 	}
 	if err != nil {
 		return nil, err
