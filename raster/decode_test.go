@@ -18,12 +18,12 @@ func TestDecode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := d.ReadPageHeader()
+	p, err := d.NextPage()
 	if err != nil {
 		t.Fatal(err)
 	}
-	spew.Dump(h)
-	b, err := d.ReadAll()
+	spew.Dump(p.Header)
+	b, err := p.ReadAll()
 	if err != nil {
 		t.Fatal(err)
 	}

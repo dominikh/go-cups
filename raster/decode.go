@@ -4,6 +4,10 @@ package raster
 // 1) decode the whole image into an image.Image (or a []byte?)
 // 2) read one line at a time
 
+// TODO instead of storing a line buffer in the Page, allow the user
+// to pass a []byte to ReadLine. Add a method to Page that returns the
+// correct size.
+
 import (
 	"bytes"
 	"encoding/binary"
@@ -50,13 +54,8 @@ func parseMagic(b []byte) (version int, bo binary.ByteOrder, ok bool) {
 type Decoder struct {
 	r       io.Reader
 	bo      binary.ByteOrder
-	version int
-	header  *PageHeader
 	err     error
-
-	line    []byte
-	lineRep int
-	color   []byte
+	version int
 }
 
 func NewDecoder(r io.Reader) (*Decoder, error) {
@@ -74,87 +73,99 @@ func NewDecoder(r io.Reader) (*Decoder, error) {
 	return d, nil
 }
 
-func (d *Decoder) ReadPageHeader() (*PageHeader, error) {
+type Page struct {
+	Header  *PageHeader
+	dec     *Decoder
+	line    []byte
+	color   []byte
+	lineRep int
+}
+
+// NextPage returns the next page in the raster stream. The returned
+// page is only valid until the next call to NextPage.
+func (d *Decoder) NextPage() (*Page, error) {
 	// TODO if the user didn't read all lines, skip over them
 	var err error
+	var h *PageHeader
 	switch d.version {
 	case 1:
-		d.header, err = d.decodeV1Header()
+		h, err = d.decodeV1Header()
 	case 2, 3:
-		d.header, err = d.decodeV2Header()
+		h, err = d.decodeV2Header()
 	default:
 		return nil, ErrUnsupported
 	}
-	return d.header, err
+	if err != nil {
+		return nil, err
+	}
+	bpc, err := bytesPerColor(h)
+	if err != nil {
+		return nil, err
+	}
+	p := &Page{
+		Header: h,
+		dec:    d,
+		line:   make([]byte, 0, h.CUPSBytesPerLine),
+		color:  make([]byte, bpc),
+	}
+	return p, nil
 }
 
 // ReadLine returns the next line of pixels in the image. The returned
 // slice will only be valid until the next call to ReadLine.
-func (d *Decoder) ReadLine() ([]byte, error) {
-	//log.Println(d.line != nil, d.lineRep)
-	if d.line == nil {
-		d.line = make([]byte, d.header.CUPSBytesPerLine)
-	}
-	if d.color == nil {
-		bpc, err := bytesPerColor(d.header)
-		if err != nil {
-			return nil, err
-		}
-		d.color = make([]byte, bpc)
-	}
-
-	if d.lineRep > 0 {
-		d.lineRep--
-		return d.line, nil
+func (p *Page) ReadLine() ([]byte, error) {
+	if p.lineRep > 0 {
+		p.lineRep--
+		return p.line, nil
 	}
 
 	var lineRep byte
-	err := binary.Read(d.r, d.bo, &lineRep)
+	err := binary.Read(p.dec.r, p.dec.bo, &lineRep)
 	if err != nil {
 		return nil, err
 	}
-	d.line = d.line[:0]
+	p.line = p.line[:0]
 	// the count is stored as count - 1, but we're already reading the
 	// first line, anyway.
-	d.lineRep = int(lineRep)
+	p.lineRep = int(lineRep)
 
-	for len(d.line) < int(d.header.CUPSBytesPerLine) {
+	for len(p.line) < int(p.Header.CUPSBytesPerLine) {
 		var n byte
-		err := binary.Read(d.r, d.bo, &n)
+		err := binary.Read(p.dec.r, p.dec.bo, &n)
 		if err != nil {
 			return nil, err
 		}
 		if n <= 127 {
 			// n repeating colors
 			n := int(n + 1)
-			_, err := io.ReadFull(d.r, d.color)
+			_, err := io.ReadFull(p.dec.r, p.color)
 			if err != nil {
 				return nil, err
 			}
 
 			for i := 0; i < n; i++ {
-				d.line = append(d.line, d.color...)
+				p.line = append(p.line, p.color...)
 			}
 		} else {
 			// n non-repeating colors
 			n := 257 - int(n)
 			for i := 0; i < n; i++ {
-				_, err := io.ReadFull(d.r, d.color)
+				_, err := io.ReadFull(p.dec.r, p.color)
 				if err != nil {
 					return nil, err
 				}
-				d.line = append(d.line, d.color...)
+				p.line = append(p.line, p.color...)
 			}
 		}
 	}
 
-	return d.line, nil
+	return p.line, nil
 }
 
-func (d *Decoder) ReadAll() ([]byte, error) {
-	b := make([]byte, 0, d.header.CUPSHeight*d.header.CUPSBytesPerLine)
-	for i := uint32(0); i < d.header.CUPSHeight; i++ {
-		line, err := d.ReadLine()
+func (p *Page) ReadAll() ([]byte, error) {
+	b := make([]byte, 0, p.Header.CUPSHeight*p.Header.CUPSBytesPerLine)
+	for i := uint32(0); i < p.Header.CUPSHeight; i++ {
+		line, err := p.ReadLine()
 		if err != nil {
 			return b, err
 		}
@@ -331,18 +342,6 @@ func (d *Decoder) decodeV2Header() (*PageHeader, error) {
 	h.CUPSPageSizeName = d.readCString()
 
 	return h, d.err
-}
-
-func (d *Decoder) readv2RasterData() ([]byte, error) {
-	var b []byte
-
-	for i := 0; i < int(d.header.CUPSHeight); i++ {
-		// FIXME handle err
-		line, err := d.ReadLine()
-		_ = err
-		b = append(b, line...)
-	}
-	return b, nil
 }
 
 func bytesPerColor(h *PageHeader) (int, error) {
