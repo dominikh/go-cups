@@ -23,7 +23,8 @@ func TestDecode(t *testing.T) {
 		t.Fatal(err)
 	}
 	spew.Dump(p.Header)
-	b, err := p.ReadAll()
+	b := make([]byte, p.TotalSize())
+	err = p.ReadAll(b)
 	if err != nil {
 		t.Fatal(err)
 	}

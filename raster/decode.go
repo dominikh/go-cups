@@ -1,13 +1,5 @@
 package raster
 
-// TODO provide two APIs for decoding:
-// 1) decode the whole image into an image.Image (or a []byte?)
-// 2) read one line at a time
-
-// TODO instead of storing a line buffer in the Page, allow the user
-// to pass a []byte to ReadLine. Add a method to Page that returns the
-// correct size.
-
 import (
 	"bytes"
 	"encoding/binary"
@@ -113,16 +105,20 @@ func (d *Decoder) NextPage() (*Page, error) {
 
 // ReadLine returns the next line of pixels in the image. The returned
 // slice will only be valid until the next call to ReadLine.
-func (p *Page) ReadLine() ([]byte, error) {
+func (p *Page) ReadLine(b []byte) error {
+	if len(b) < cap(p.line) {
+		panic("buffer to Page.ReadLine is too small")
+	}
 	if p.lineRep > 0 {
 		p.lineRep--
-		return p.line, nil
+		copy(b, p.line)
+		return nil
 	}
 
 	var lineRep byte
 	err := binary.Read(p.dec.r, p.dec.bo, &lineRep)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	p.line = p.line[:0]
 	// the count is stored as count - 1, but we're already reading the
@@ -133,14 +129,14 @@ func (p *Page) ReadLine() ([]byte, error) {
 		var n byte
 		err := binary.Read(p.dec.r, p.dec.bo, &n)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if n <= 127 {
 			// n repeating colors
 			n := int(n + 1)
 			_, err := io.ReadFull(p.dec.r, p.color)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			for i := 0; i < n; i++ {
@@ -152,26 +148,37 @@ func (p *Page) ReadLine() ([]byte, error) {
 			for i := 0; i < n; i++ {
 				_, err := io.ReadFull(p.dec.r, p.color)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				p.line = append(p.line, p.color...)
 			}
 		}
 	}
-
-	return p.line, nil
+	copy(b, p.line)
+	return nil
 }
 
-func (p *Page) ReadAll() ([]byte, error) {
-	b := make([]byte, 0, p.Header.CUPSHeight*p.Header.CUPSBytesPerLine)
-	for i := uint32(0); i < p.Header.CUPSHeight; i++ {
-		line, err := p.ReadLine()
-		if err != nil {
-			return b, err
-		}
-		b = append(b, line...)
+func (p *Page) ReadAll(b []byte) error {
+	if uint64(len(b)) < uint64(p.TotalSize()) {
+		panic("buffer to Page.ReadAll is too small")
 	}
-	return b, nil
+	for i := uint32(0); i < p.Header.CUPSHeight; i++ {
+		err := p.ReadLine(b[i*p.Header.CUPSBytesPerLine:])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// LineSize returns the size of a single line, in bytes.
+func (p *Page) LineSize() uint32 {
+	return p.Header.CUPSBytesPerLine
+}
+
+// TotalSize returns the size of the entire page, in bytes.
+func (p *Page) TotalSize() uint32 {
+	return p.Header.CUPSHeight * p.Header.CUPSBytesPerLine
 }
 
 func cstring(b []byte) string {
