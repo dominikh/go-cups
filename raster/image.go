@@ -66,6 +66,7 @@ func (p *Page) parseColorsCMYK(b []byte) ([]color.Color, error) {
 }
 
 func (p *Page) rect() image.Rectangle {
+	// TODO respect bounding box
 	return image.Rect(0, 0, int(p.Header.CUPSWidth), int(p.Header.CUPSHeight))
 }
 
@@ -100,7 +101,11 @@ func (p *Page) Image() (image.Image, error) {
 	}
 	switch p.Header.CUPSColorSpace {
 	case ColorSpaceBlack:
-		return &Monochrome{p: p, data: b}, nil
+		return &Monochrome{
+			Pix:    b,
+			Stride: int(p.Header.CUPSBytesPerLine),
+			Rect:   p.rect(),
+		}, nil
 	case ColorSpaceCMYK:
 		if p.Header.CUPSBitsPerColor != 8 {
 			return nil, ErrUnsupported
@@ -120,8 +125,9 @@ func (p *Page) Image() (image.Image, error) {
 var _ image.Image = (*Monochrome)(nil)
 
 type Monochrome struct {
-	p    *Page
-	data []byte
+	Pix    []uint8
+	Stride int
+	Rect   image.Rectangle
 }
 
 func (img *Monochrome) ColorModel() color.Model {
@@ -129,13 +135,20 @@ func (img *Monochrome) ColorModel() color.Model {
 }
 
 func (img *Monochrome) Bounds() image.Rectangle {
-	return img.p.rect()
+	return img.Rect
 }
 
 func (img *Monochrome) At(x, y int) color.Color {
-	idx := y*int(img.p.Header.CUPSBytesPerLine) + (x / 8)
-	if img.data[idx]<<uint(x%8)&128 == 0 {
+	idx := img.PixOffset(x, y)
+	if img.Pix[idx]<<uint(x%8)&128 == 0 {
 		return color.Gray{Y: 255}
 	}
 	return color.Gray{Y: 0}
+}
+
+// PixOffset returns the index of the first element of Pix that
+// corresponds to the pixel at (x, y).
+func (img *Monochrome) PixOffset(x, y int) int {
+	// TODO respect non-zero starting point of bounding box
+	return y*img.Stride + (x / 8)
 }
