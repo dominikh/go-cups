@@ -20,11 +20,11 @@ func rect(p *raster.Page) image.Rectangle {
 // implementations from this package or from the Go standard library
 // image package may be used. The mapping is as follows:
 //
-// - 1-bit, ColorSpaceBlack -> *Monochrome
-// - 8-bit, ColorSpaceBlack -> *image.Gray
-// - 8-bit, ColorSpaceCMYK -> *image.CMYK
-// - Other combinations are not currently supported and will return
-//   ErrUnsupported. They might be added in the future.
+//   - 1-bit, ColorSpaceBlack -> *Monochrome
+//   - 8-bit, ColorSpaceBlack -> *image.Gray
+//   - 8-bit, ColorSpaceCMYK -> *image.CMYK
+//   - Other combinations are not currently supported and will return
+//     ErrUnsupported. They might be added in the future.
 //
 // No calls to ReadLine or ReadAll must be made before or after
 // calling Image. That is, Image consumes the entire stream of the

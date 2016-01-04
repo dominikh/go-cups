@@ -178,9 +178,9 @@ type Header struct {
 // It currently supports the following color spaces and bit depths,
 // although more might be added later:
 //
-// - 1-bit, ColorSpaceBlack -> color.Gray
-// - 8-bit, ColorSpaceBlack -> color.Gray
-// - 8-bit, ColorSpaceCMYK -> color.CMYK
+//   - 1-bit, ColorSpaceBlack -> color.Gray
+//   - 8-bit, ColorSpaceBlack -> color.Gray
+//   - 8-bit, ColorSpaceCMYK -> color.CMYK
 func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 	// TODO support banded and planar
 	if p.Header.CUPSColorOrder != ChunkyPixels {
