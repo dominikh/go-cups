@@ -1,78 +1,15 @@
-package raster
+package image
 
 import (
 	"image"
 	"image/color"
+
+	"honnef.co/go/cups/raster"
 )
 
 // FIXME respect bounding boxes
 
-// ParseColors parses b and returns the colors stored in it, one per
-// pixel.
-//
-// It currently supports the following color spaces and bit depths,
-// although more might be added later:
-//
-// - 1-bit, ColorSpaceBlack -> color.Gray
-// - 8-bit, ColorSpaceBlack -> color.Gray
-// - 8-bit, ColorSpaceCMYK -> color.CMYK
-func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
-	// TODO support banded and planar
-	if p.Header.CUPSColorOrder != ChunkyPixels {
-		return nil, ErrUnsupported
-	}
-	switch p.Header.CUPSColorSpace {
-	case ColorSpaceBlack:
-		return p.parseColorsBlack(b)
-	case ColorSpaceCMYK:
-		return p.parseColorsCMYK(b)
-	default:
-		return nil, ErrUnsupported
-	}
-}
-
-func (p *Page) parseColorsBlack(b []byte) ([]color.Color, error) {
-	// TODO support all depths
-	var colors []color.Color
-	switch p.Header.CUPSBitsPerColor {
-	case 1:
-		for _, packet := range b {
-			for i := uint(0); i < 8; i++ {
-				if packet<<i&128 == 0 {
-					colors = append(colors, color.Gray{255})
-				} else {
-					colors = append(colors, color.Gray{0})
-				}
-			}
-		}
-	case 8:
-		for _, v := range b {
-			colors = append(colors, color.Gray{Y: 255 - v})
-		}
-	default:
-		return nil, ErrUnsupported
-	}
-	return colors, nil
-}
-
-func (p *Page) parseColorsCMYK(b []byte) ([]color.Color, error) {
-	if p.Header.CUPSBitsPerColor != 8 {
-		return nil, ErrUnsupported
-	}
-	if len(b)%4 != 0 || len(b) < 4 {
-		return nil, ErrInvalidFormat
-	}
-	var colors []color.Color
-	for i := 0; i < len(b); i += 4 {
-		// TODO does cups have a byte order for colors in a pixel and
-		// do we need to swap bytes?
-		c := color.CMYK{C: b[i], M: b[i+1], Y: b[i+2], K: b[i+3]}
-		colors = append(colors, c)
-	}
-	return colors, nil
-}
-
-func (p *Page) rect() image.Rectangle {
+func rect(p *raster.Page) image.Rectangle {
 	// TODO respect bounding box
 	return image.Rect(0, 0, int(p.Header.CUPSWidth), int(p.Header.CUPSHeight))
 }
@@ -96,7 +33,7 @@ func (p *Page) rect() image.Rectangle {
 // Note that decoding an entire page at once may use considerable
 // amounts of memory. For efficient, line-wise processing, a
 // combination of ReadLine and ParseColors should be used instead.
-func (p *Page) Image() (image.Image, error) {
+func Image(p *raster.Page) (image.Image, error) {
 	b := make([]byte, p.TotalSize())
 	err := p.ReadAll(b)
 	if err != nil {
@@ -104,17 +41,17 @@ func (p *Page) Image() (image.Image, error) {
 	}
 
 	// FIXME support color orders other than chunked
-	if p.Header.CUPSColorOrder != ChunkyPixels {
-		return nil, ErrUnsupported
+	if p.Header.CUPSColorOrder != raster.ChunkyPixels {
+		return nil, raster.ErrUnsupported
 	}
 	switch p.Header.CUPSColorSpace {
-	case ColorSpaceBlack:
+	case raster.ColorSpaceBlack:
 		switch p.Header.CUPSBitsPerColor {
 		case 1:
 			return &Monochrome{
 				Pix:    b,
 				Stride: int(p.Header.CUPSBytesPerLine),
-				Rect:   p.rect(),
+				Rect:   rect(p),
 			}, nil
 		case 8:
 			for i, v := range b {
@@ -123,24 +60,24 @@ func (p *Page) Image() (image.Image, error) {
 			return &image.Gray{
 				Pix:    b,
 				Stride: int(p.Header.CUPSBytesPerLine),
-				Rect:   p.rect(),
+				Rect:   rect(p),
 			}, nil
 		default:
-			return nil, ErrUnsupported
+			return nil, raster.ErrUnsupported
 		}
-	case ColorSpaceCMYK:
+	case raster.ColorSpaceCMYK:
 		if p.Header.CUPSBitsPerColor != 8 {
-			return nil, ErrUnsupported
+			return nil, raster.ErrUnsupported
 		}
 		// TODO does cups have a byte order for colors in a pixel and
 		// do we need to swap bytes?
 		return &image.CMYK{
 			Pix:    b,
 			Stride: int(p.Header.CUPSBytesPerLine),
-			Rect:   p.rect(),
+			Rect:   rect(p),
 		}, nil
 	default:
-		return nil, ErrUnsupported
+		return nil, raster.ErrUnsupported
 	}
 }
 

@@ -1,5 +1,7 @@
 package raster
 
+import "image/color"
+
 const (
 	AdvanceNever     = 0
 	AdvanceAfterFile = 1
@@ -168,4 +170,79 @@ type Header struct {
 	CUPSMarkerType              string
 	CUPSRenderingIntent         string
 	CUPSPageSizeName            string
+}
+
+// ParseColors parses b and returns the colors stored in it, one per
+// pixel.
+//
+// It currently supports the following color spaces and bit depths,
+// although more might be added later:
+//
+// - 1-bit, ColorSpaceBlack -> color.Gray
+// - 8-bit, ColorSpaceBlack -> color.Gray
+// - 8-bit, ColorSpaceCMYK -> color.CMYK
+func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
+	// TODO support banded and planar
+	if p.Header.CUPSColorOrder != ChunkyPixels {
+		return nil, ErrUnsupported
+	}
+	switch p.Header.CUPSColorSpace {
+	case ColorSpaceBlack:
+		return p.parseColorsBlack(b)
+	case ColorSpaceCMYK:
+		return p.parseColorsCMYK(b)
+	default:
+		return nil, ErrUnsupported
+	}
+}
+
+func (p *Page) parseColorsBlack(b []byte) ([]color.Color, error) {
+	// TODO support all depths
+	var colors []color.Color
+	switch p.Header.CUPSBitsPerColor {
+	case 1:
+		for _, packet := range b {
+			for i := uint(0); i < 8; i++ {
+				if packet<<i&128 == 0 {
+					colors = append(colors, color.Gray{255})
+				} else {
+					colors = append(colors, color.Gray{0})
+				}
+			}
+		}
+	case 8:
+		for _, v := range b {
+			colors = append(colors, color.Gray{Y: 255 - v})
+		}
+	default:
+		return nil, ErrUnsupported
+	}
+	return colors, nil
+}
+
+func (p *Page) parseColorsCMYK(b []byte) ([]color.Color, error) {
+	if p.Header.CUPSBitsPerColor != 8 {
+		return nil, ErrUnsupported
+	}
+	if len(b)%4 != 0 || len(b) < 4 {
+		return nil, ErrInvalidFormat
+	}
+	var colors []color.Color
+	for i := 0; i < len(b); i += 4 {
+		// TODO does cups have a byte order for colors in a pixel and
+		// do we need to swap bytes?
+		c := color.CMYK{C: b[i], M: b[i+1], Y: b[i+2], K: b[i+3]}
+		colors = append(colors, c)
+	}
+	return colors, nil
+}
+
+// LineSize returns the size of a single line, in bytes.
+func (p *Page) LineSize() uint32 {
+	return p.Header.CUPSBytesPerLine
+}
+
+// TotalSize returns the size of the entire page, in bytes.
+func (p *Page) TotalSize() uint32 {
+	return p.Header.CUPSHeight * p.Header.CUPSBytesPerLine
 }

@@ -224,16 +224,6 @@ func (p *Page) ReadAll(b []byte) error {
 	return nil
 }
 
-// LineSize returns the size of a single line, in bytes.
-func (p *Page) LineSize() uint32 {
-	return p.Header.CUPSBytesPerLine
-}
-
-// TotalSize returns the size of the entire page, in bytes.
-func (p *Page) TotalSize() uint32 {
-	return p.Header.CUPSHeight * p.Header.CUPSBytesPerLine
-}
-
 func cstring(b []byte) string {
 	idx := bytes.IndexByte(b, 0)
 	if idx < 0 {

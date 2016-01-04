@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"honnef.co/go/cups/raster"
+	"honnef.co/go/cups/raster/image"
 )
 
 func main() {
@@ -31,7 +32,7 @@ func main() {
 	// 	Max: image.Point{X: int(p.Header.CUPSWidth), Y: int(p.Header.CUPSHeight)},
 	// }, palette)
 
-	img, err := p.Image()
+	img, err := image.Image(p)
 	if err != nil {
 		log.Fatal(err)
 	}
