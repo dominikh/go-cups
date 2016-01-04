@@ -7,8 +7,8 @@ import (
 	"io"
 )
 
-var ErrUnsupported = errors.New("unsupported file format")
-var ErrUnknownColorOrder = errors.New("unknown color order")
+var ErrUnknownVersion = errors.New("unsupported file format or version")
+var ErrUnsupported = errors.New("unsupported feature")
 var ErrBufferTooSmall = errors.New("buffer too small")
 var ErrInvalidFormat = errors.New("error in the format")
 
@@ -73,7 +73,7 @@ func NewDecoder(r io.Reader) (*Decoder, error) {
 	var ok bool
 	d.version, d.bo, ok = parseMagic(magic)
 	if !ok {
-		return nil, ErrUnsupported
+		return nil, ErrUnknownVersion
 	}
 	return d, nil
 }
@@ -102,7 +102,8 @@ func (d *Decoder) NextPage() (*Page, error) {
 	case 2, 3:
 		h, err = d.decodeV2Header()
 	default:
-		return nil, ErrUnsupported
+		// can't happen, NewDecoder rejects unknown versions
+		panic("impossible")
 	}
 	if err == io.EOF && d.r.n != n {
 		return nil, io.ErrUnexpectedEOF
@@ -138,7 +139,8 @@ func (p *Page) ReadLine(b []byte) error {
 	case 3:
 		return p.readRawLine(b)
 	default:
-		return ErrUnsupported
+		// can't happen, NewDecoder rejects unknown versions
+		panic("impossible")
 	}
 }
 
@@ -409,6 +411,7 @@ func bytesPerColor(h *PageHeader) (int, error) {
 	case BandedPixels, PlanarPixels:
 		return int(h.CUPSBitsPerColor+7) / 8, nil
 	default:
-		return 0, ErrUnknownColorOrder
+		// The versions that we support only know these 3 color orders
+		return 0, ErrInvalidFormat
 	}
 }
