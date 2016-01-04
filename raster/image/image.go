@@ -1,3 +1,5 @@
+// Package image allows using CUPS raster pages in combination with
+// image.Image.
 package image
 
 import (
