@@ -86,8 +86,10 @@ type Page struct {
 	lineRep int
 }
 
-// NextPage returns the next page in the raster stream. The returned
-// page is only valid until the next call to NextPage.
+// NextPage returns the next page in the raster stream. After a call
+// to NextPage, all previously returned pages from this decoder cannot
+// be used to decode image data anymore. Their header data, however,
+// remains valid.
 func (d *Decoder) NextPage() (*Page, error) {
 	// TODO if the user didn't read all lines, skip over them
 	var err error
