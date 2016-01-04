@@ -28,7 +28,7 @@ func rect(p *raster.Page) image.Rectangle {
 //
 // No calls to ReadLine or ReadAll must be made before or after
 // calling Image. That is, Image consumes the entire stream of the
-// current page.
+// page.
 //
 // Note that decoding an entire page at once may use considerable
 // amounts of memory. For efficient, line-wise processing, a

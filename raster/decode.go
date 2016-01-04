@@ -7,10 +7,26 @@ import (
 	"io"
 )
 
-var ErrUnknownVersion = errors.New("unsupported file format or version")
-var ErrUnsupported = errors.New("unsupported feature")
-var ErrBufferTooSmall = errors.New("buffer too small")
-var ErrInvalidFormat = errors.New("error in the format")
+var (
+	// ErrUnknownVersion is returned when encountering an unknown
+	// magic byte sequence. It is indicative of input in a newer
+	// format, or input that isn't a CUPS raster stream at all.
+	ErrUnknownVersion = errors.New("unsupported file format or version")
+
+	// ErrUnsupported is returned when encountering an unsupported
+	// feature. This includes unsupported color spaces, color
+	// orderings or bit depths.
+	ErrUnsupported = errors.New("unsupported feature")
+
+	// ErrBufferTooSmall is returned from ReadLine and ReadAll when
+	// the buffer is smaller than Page.LineSize or Page.TotalSize
+	// respectively.
+	ErrBufferTooSmall = errors.New("buffer too small")
+
+	// ErrInvalidFormat is returned when encountering values that
+	// aren't possible in the supported versions of the format.
+	ErrInvalidFormat = errors.New("error in the format")
+)
 
 const (
 	syncV1BE = "RaSt"
@@ -124,8 +140,7 @@ func (d *Decoder) NextPage() (*Page, error) {
 	return p, nil
 }
 
-// ReadLine returns the next line of pixels in the image. The returned
-// slice will only be valid until the next call to ReadLine.
+// ReadLine returns the next line of pixels in the image.
 func (p *Page) ReadLine(b []byte) error {
 	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
 		return ErrBufferTooSmall
@@ -206,7 +221,10 @@ func (p *Page) readRawLine(b []byte) error {
 	return err
 }
 
+// ReadAll reads the entire page into b.
 func (p *Page) ReadAll(b []byte) error {
+	// TODO If ReadLine has been called previously, ReadAll will read
+	// the remainder of the page.
 	if uint64(len(b)) < uint64(p.TotalSize()) {
 		return ErrBufferTooSmall
 	}
