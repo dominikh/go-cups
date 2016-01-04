@@ -55,33 +55,6 @@ func (p *Page) parseColorsCMYK(b []byte) ([]color.Color, error) {
 	return colors, nil
 }
 
-type ImageSetter interface {
-	Set(x, y int, c color.Color)
-}
-
-// Render renders a CUPS raster image onto any image.Image that
-// implements the Set method.
-func (p *Page) Render(img ImageSetter) error {
-	b := make([]byte, p.LineSize())
-	for y := uint32(0); y < p.Header.CUPSHeight; y++ {
-		err := p.ReadLine(b)
-		if err == io.EOF {
-			return io.ErrUnexpectedEOF
-		}
-		if err != nil {
-			return err
-		}
-		colors, err := p.ParseColors(b)
-		if err != nil {
-			return err
-		}
-		for x, color := range colors {
-			img.Set(x, int(y), color)
-		}
-	}
-	return nil
-}
-
 func (p *Page) rect() image.Rectangle {
 	return image.Rect(0, 0, int(p.Header.CUPSWidth), int(p.Header.CUPSHeight))
 }
