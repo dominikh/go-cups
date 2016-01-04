@@ -163,7 +163,9 @@ func (p *Page) ReadLine(b []byte) error {
 	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
 		return ErrBufferTooSmall
 	}
-
+	if p.UnreadLines() == 0 {
+		return io.EOF
+	}
 	p.linesRead++
 	switch p.dec.version {
 	case 1:
@@ -179,6 +181,12 @@ func (p *Page) ReadLine(b []byte) error {
 }
 
 func (p *Page) readV2Line(b []byte) (err error) {
+	defer func() {
+		if err == io.EOF {
+			err = io.ErrUnexpectedEOF
+		}
+	}()
+
 	if p.lineRep > 0 {
 		p.lineRep--
 		copy(b, p.line)
@@ -194,12 +202,6 @@ func (p *Page) readV2Line(b []byte) (err error) {
 	// the count is stored as count - 1, but we're already reading the
 	// first line, anyway.
 	p.lineRep = int(lineRep)
-
-	defer func() {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-	}()
 
 	for len(p.line) < int(p.Header.CUPSBytesPerLine) {
 		var n byte
