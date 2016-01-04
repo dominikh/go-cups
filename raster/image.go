@@ -13,13 +13,16 @@ func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 	}
 	switch p.Header.CUPSColorSpace {
 	case ColorSpaceBlack:
-		return p.parseColorsBlack(b), nil
+		return p.parseColorsBlack(b)
 	default:
 		return nil, ErrUnsupported
 	}
 }
 
-func (p *Page) parseColorsBlack(b []byte) []color.Color {
+func (p *Page) parseColorsBlack(b []byte) ([]color.Color, error) {
+	if p.Header.CUPSBitsPerColor != 1 {
+		return nil, ErrUnsupported
+	}
 	var colors []color.Color
 	for _, packet := range b {
 		for i := uint(0); i < 8; i++ {
@@ -30,7 +33,7 @@ func (p *Page) parseColorsBlack(b []byte) []color.Color {
 			}
 		}
 	}
-	return colors
+	return colors, nil
 }
 
 type ImageSetter interface {
