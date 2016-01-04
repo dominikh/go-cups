@@ -60,6 +60,10 @@ func (p *Page) Render(img ImageSetter) error {
 	return nil
 }
 
+func (p *Page) rect() image.Rectangle {
+	return image.Rect(0, 0, int(p.Header.CUPSWidth), int(p.Header.CUPSHeight))
+}
+
 func (p *Page) Image() (image.Image, error) {
 	b := make([]byte, p.TotalSize())
 	err := p.ReadAll(b)
@@ -71,6 +75,17 @@ func (p *Page) Image() (image.Image, error) {
 	switch p.Header.CUPSColorSpace {
 	case ColorSpaceBlack:
 		return &Monochrome{p: p, data: b}, nil
+	case ColorSpaceCMYK:
+		if p.Header.CUPSBitsPerColor != 8 {
+			return nil, ErrUnsupported
+		}
+		// TODO does cups have a byte order for colors in a pixel and
+		// do we need to swap bytes?
+		return &image.CMYK{
+			Pix:    b,
+			Stride: int(p.Header.CUPSBytesPerLine),
+			Rect:   p.rect(),
+		}, nil
 	default:
 		return nil, ErrUnsupported
 	}
@@ -88,7 +103,7 @@ func (img *Monochrome) ColorModel() color.Model {
 }
 
 func (img *Monochrome) Bounds() image.Rectangle {
-	return image.Rect(0, 0, int(img.p.Header.CUPSWidth), int(img.p.Header.CUPSHeight))
+	return img.p.rect()
 }
 
 func (img *Monochrome) At(x, y int) color.Color {
