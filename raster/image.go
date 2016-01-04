@@ -79,11 +79,11 @@ type Image struct {
 	p    *Page
 	data []byte
 	// y -> (x -> offset)
-	ys map[int]map[int]int
+	ys map[int]int
 }
 
 func (img *Image) populateCache() {
-	img.ys = map[int]map[int]int{}
+	img.ys = map[int]int{}
 	// TODO support other color spaces
 	y := 0
 	off := 0
@@ -92,9 +92,8 @@ func (img *Image) populateCache() {
 	_ = err
 	for off < len(img.data) {
 		rep := int(img.data[off]) + 1
-		m := map[int]int{}
 		for i := 0; i < rep; i++ {
-			img.ys[y+i] = m
+			img.ys[y+i] = off + 1
 		}
 		y += rep
 		off++
@@ -106,20 +105,10 @@ func (img *Image) populateCache() {
 			if rep <= 127 {
 				// rep repeating colors
 				rep++
-				pixels := rep * ((bpc * 8) / int(img.p.Header.CUPSBitsPerPixel))
-				for i := 0; i < pixels; i++ {
-					m[x+i] = off
-				}
 				off += bpc
 			} else {
 				// rep non-repeating colors
 				rep = 257 - rep
-				ppb := ((bpc * 8) / int(img.p.Header.CUPSBitsPerPixel))
-				for i := 0; i < rep; i++ {
-					for j := 0; j < ppb; j++ {
-						m[x+i*ppb+j] = off + i*bpc
-					}
-				}
 				off += rep * bpc
 			}
 			pixels := rep * ((bpc * 8) / int(img.p.Header.CUPSBitsPerPixel))
@@ -161,14 +150,44 @@ func (img *Image) At(x, y int) color.Color {
 		img.populateCache()
 	}
 
-	off, ok := img.ys[y][x]
+	off, ok := img.ys[y]
 	if !ok {
 		panic("invalid RLE cache")
 	}
-	// FIXME don't assume monochrome color space
-	shift := uint(x % 8)
-	if img.data[off]<<shift&128 == 0 {
-		return color.Gray{Y: 255}
+
+	// FIXME don't assume monochrome or chunked
+	ppc := 8
+	d := x / ppc
+	colors := 0
+	// FIXME deal with error
+	bpc, err := bytesPerColor(img.p.Header)
+	_ = err
+	for {
+		rep := int(img.data[off])
+		off++
+
+		b := -1
+		if rep <= 127 {
+			rep++
+			if d >= colors && d <= colors+rep {
+				b = int(img.data[off])
+			}
+			off += bpc
+		} else {
+			rep = 257 - rep
+			if d >= colors && d <= colors+rep {
+				b = int(img.data[off+(d-colors)*bpc])
+			}
+			off += rep * bpc
+		}
+		colors += rep
+		if b > -1 {
+			b := byte(b)
+			// FIXME don't assume monochrome or chunked
+			if b<<uint(x%8)&128 == 0 {
+				return color.Gray{Y: 255}
+			}
+			return color.Gray{Y: 0}
+		}
 	}
-	return color.Gray{Y: 0}
 }
