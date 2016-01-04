@@ -249,12 +249,16 @@ func (p *Page) UnreadLines() int {
 }
 
 // ReadAll reads the entire page into b. If ReadLine has been called
-// previously, ReadAll will read the remainder of the page.
+// previously, ReadAll will read the remainder of the page. It returns
+// io.EOF if the entire page has been read already.
 func (p *Page) ReadAll(b []byte) error {
 	if len(b) < int(p.LineSize())*p.UnreadLines() {
 		return ErrBufferTooSmall
 	}
 	n := p.UnreadLines()
+	if n == 0 {
+		return io.EOF
+	}
 	for i := uint32(0); i < uint32(n); i++ {
 		start := i * p.Header.CUPSBytesPerLine
 		end := start + p.Header.CUPSBytesPerLine
