@@ -14,6 +14,7 @@ import (
 // although more might be added later:
 //
 // - 1-bit, ColorSpaceBlack -> color.Gray
+// - 8-bit, ColorSpaceBlack -> color.Gray
 // - 8-bit, ColorSpaceCMYK -> color.CMYK
 func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 	// TODO support banded and planar
@@ -31,19 +32,25 @@ func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 }
 
 func (p *Page) parseColorsBlack(b []byte) ([]color.Color, error) {
-	if p.Header.CUPSBitsPerColor != 1 {
-		// TODO support all depths
-		return nil, ErrUnsupported
-	}
+	// TODO support all depths
 	var colors []color.Color
-	for _, packet := range b {
-		for i := uint(0); i < 8; i++ {
-			if packet<<i&128 == 0 {
-				colors = append(colors, color.Gray{255})
-			} else {
-				colors = append(colors, color.Gray{0})
+	switch p.Header.CUPSBitsPerColor {
+	case 1:
+		for _, packet := range b {
+			for i := uint(0); i < 8; i++ {
+				if packet<<i&128 == 0 {
+					colors = append(colors, color.Gray{255})
+				} else {
+					colors = append(colors, color.Gray{0})
+				}
 			}
 		}
+	case 8:
+		for _, v := range b {
+			colors = append(colors, color.Gray{Y: 255 - v})
+		}
+	default:
+		return nil, ErrUnsupported
 	}
 	return colors, nil
 }
@@ -77,6 +84,7 @@ func (p *Page) rect() image.Rectangle {
 // image package may be used. The mapping is as follows:
 //
 // - 1-bit, ColorSpaceBlack -> *Monochrome
+// - 8-bit, ColorSpaceBlack -> *image.Gray
 // - 8-bit, ColorSpaceCMYK -> *image.CMYK
 // - Other combinations are not currently supported and will return
 //   ErrUnsupported. They might be added in the future.
@@ -101,11 +109,25 @@ func (p *Page) Image() (image.Image, error) {
 	}
 	switch p.Header.CUPSColorSpace {
 	case ColorSpaceBlack:
-		return &Monochrome{
-			Pix:    b,
-			Stride: int(p.Header.CUPSBytesPerLine),
-			Rect:   p.rect(),
-		}, nil
+		switch p.Header.CUPSBitsPerColor {
+		case 1:
+			return &Monochrome{
+				Pix:    b,
+				Stride: int(p.Header.CUPSBytesPerLine),
+				Rect:   p.rect(),
+			}, nil
+		case 8:
+			for i, v := range b {
+				b[i] = 255 - v
+			}
+			return &image.Gray{
+				Pix:    b,
+				Stride: int(p.Header.CUPSBytesPerLine),
+				Rect:   p.rect(),
+			}, nil
+		default:
+			return nil, ErrUnsupported
+		}
 	case ColorSpaceCMYK:
 		if p.Header.CUPSBitsPerColor != 8 {
 			return nil, ErrUnsupported
