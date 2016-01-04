@@ -60,14 +60,19 @@ func (p *Page) Render(img ImageSetter) error {
 	return nil
 }
 
-func (p *Page) Image() image.Image {
+func (p *Page) Image() (image.Image, error) {
 	b := make([]byte, p.TotalSize())
-	_ = p.ReadAll(b)
+	err := p.ReadAll(b)
+	if err != nil {
+		return nil, err
+	}
 
 	// FIXME support color orders other than chunked
 	switch p.Header.CUPSColorSpace {
 	case ColorSpaceBlack:
-		return &Monochrome{p: p, data: b}
+		return &Monochrome{p: p, data: b}, nil
+	default:
+		return nil, ErrUnsupported
 	}
 }
 

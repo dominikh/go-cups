@@ -31,7 +31,10 @@ func main() {
 	// 	Max: image.Point{X: int(p.Header.CUPSWidth), Y: int(p.Header.CUPSHeight)},
 	// }, palette)
 
-	img := p.Image()
+	img, err := p.Image()
+	if err != nil {
+		log.Fatal(err)
+	}
 	// img.(*raster.Image).Render2(img2)
 
 	// err = p.Render(img2)
