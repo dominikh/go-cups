@@ -14,6 +14,8 @@ func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 	switch p.Header.CUPSColorSpace {
 	case ColorSpaceBlack:
 		return p.parseColorsBlack(b)
+	case ColorSpaceCMYK:
+		return p.parseColorsCMYK(b)
 	default:
 		return nil, ErrUnsupported
 	}
@@ -32,6 +34,23 @@ func (p *Page) parseColorsBlack(b []byte) ([]color.Color, error) {
 				colors = append(colors, color.Gray{0})
 			}
 		}
+	}
+	return colors, nil
+}
+
+func (p *Page) parseColorsCMYK(b []byte) ([]color.Color, error) {
+	if p.Header.CUPSBitsPerColor != 8 {
+		return nil, ErrUnsupported
+	}
+	if len(b)%4 != 0 || len(b) < 4 {
+		return nil, ErrInvalidFormat
+	}
+	var colors []color.Color
+	for i := 0; i < len(b); i += 4 {
+		// TODO does cups have a byte order for colors in a pixel and
+		// do we need to swap bytes?
+		c := color.CMYK{C: b[i], M: b[i+1], Y: b[i+2], K: b[i+3]}
+		colors = append(colors, c)
 	}
 	return colors, nil
 }

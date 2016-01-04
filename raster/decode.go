@@ -10,6 +10,7 @@ import (
 var ErrUnsupported = errors.New("unsupported file format")
 var ErrUnknownColorOrder = errors.New("unknown color order")
 var ErrBufferTooSmall = errors.New("buffer too small")
+var ErrInvalidFormat = errors.New("error in the format")
 
 const (
 	syncV1BE = "RaSt"
