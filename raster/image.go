@@ -111,8 +111,8 @@ func (img *Monochrome) Bounds() image.Rectangle {
 
 func (img *Monochrome) At(x, y int) color.Color {
 	idx := y*int(img.p.Header.CUPSBytesPerLine) + (x / 8)
-	if img.data[idx]<<uint(x%8)&128 > 0 {
-		return color.Gray{Y: 0}
+	if img.data[idx]<<uint(x%8)&128 == 0 {
+		return color.Gray{Y: 255}
 	}
-	return color.Gray{Y: 255}
+	return color.Gray{Y: 0}
 }
