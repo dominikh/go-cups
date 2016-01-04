@@ -158,7 +158,8 @@ func (p *Page) discard() error {
 	return err
 }
 
-// ReadLine returns the next line of pixels in the image.
+// ReadLine returns the next line of pixels in the image. It returns
+// io.EOF if no more lines can be read.
 func (p *Page) ReadLine(b []byte) error {
 	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
 		return ErrBufferTooSmall
