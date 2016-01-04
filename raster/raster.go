@@ -181,6 +181,17 @@ type Header struct {
 //   - 1-bit, ColorSpaceBlack -> color.Gray
 //   - 8-bit, ColorSpaceBlack -> color.Gray
 //   - 8-bit, ColorSpaceCMYK -> color.CMYK
+//
+// Note that b might contain data for more colors than are actually
+// present. This happens when data is stored with less than 8 bits per
+// pixel. A page with 633 pixels per line would necessarily contain
+// data for 640 pixels, as pixels 633-640 are stored in the same byte.
+// When parsing ReadLine data, make sure to truncate the returned
+// slice to the length of a single line. When parsing ReadAll data,
+// the stride with which the resulting slice of colors is accessed has
+// to be rounded up. Alternatively, ReadLineColors and ReadAllColors
+// may be used, which return slices of colors and truncate them as
+// needed.
 func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 	// TODO support banded and planar
 	if p.Header.CUPSColorOrder != ChunkyPixels {
