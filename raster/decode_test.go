@@ -14,34 +14,8 @@ func open(s string, t *testing.T) *os.File {
 	return f
 }
 
-func TestDecode(t *testing.T) {
-	f, err := os.Open("testdata/raster")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	d, err := NewDecoder(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p, err := d.NextPage()
-	if err != nil {
-		t.Fatal(err)
-	}
-	//spew.Dump(p.Header)
-	b := make([]byte, p.TotalSize())
-	err = p.ReadAll(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	//fmt.Printf("%s", b)
-}
-
 func TestDecodeMultiplePages(t *testing.T) {
-	f, err := os.Open("testdata/two_pages")
-	if err != nil {
-		t.Fatal(err)
-	}
+	f := open("testdata/two_pages", t)
 	defer f.Close()
 	d, err := NewDecoder(f)
 	if err != nil {
@@ -52,20 +26,17 @@ func TestDecodeMultiplePages(t *testing.T) {
 	for {
 		p, err := d.NextPage()
 		if err == io.EOF {
-			t.Logf("read %d pages", i)
 			break
 		}
 		i++
 		if err != nil {
-			t.Fatal(err)
+			t.Errorf("got error %q advancing page, want nil", err)
 		}
-		//spew.Dump(p.Header)
 		b := make([]byte, p.TotalSize())
 		err = p.ReadAll(b)
 		if err != nil {
-			t.Fatal(err)
+			t.Errorf("got error %q reading page, want nil", err)
 		}
-		//fmt.Printf("%s", b)
 	}
 }
 
@@ -81,8 +52,8 @@ func TestDecodeTruncatedLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	b := make([]byte, p.LineSize())
-	lines := p.TotalSize() / p.LineSize()
-	var i uint32
+	lines := p.UnreadLines()
+	var i int
 	for i = 1; i <= lines; i++ {
 		err = p.ReadLine(b)
 		if err != nil {
