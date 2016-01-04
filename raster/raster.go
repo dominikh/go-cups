@@ -100,10 +100,10 @@ const (
 )
 
 type BoundingBox struct {
-	Left   uint32
-	Bottom uint32
-	Right  uint32
-	Top    uint32
+	Left   int
+	Bottom int
+	Right  int
+	Top    int
 }
 
 type CUPSBoundingBox struct {
@@ -120,29 +120,29 @@ type Header struct {
 	MediaColor      string
 	MediaType       string
 	OutputType      string
-	AdvanceDistance uint32
+	AdvanceDistance int
 	AdvanceMedia    int
 	Collate         bool
 	CutMedia        int
 	Duplex          bool
-	HorizDPI        uint32
-	VertDPI         uint32
+	HorizDPI        int
+	VertDPI         int
 	BoundingBox     BoundingBox
 	InsertSheet     bool
 	Jog             int
 	LeadingEdge     int
-	MarginLeft      uint32
-	MarginBottom    uint32
+	MarginLeft      int
+	MarginBottom    int
 	ManualFeed      bool
-	MediaPosition   uint32
-	MediaWeight     uint32
+	MediaPosition   int
+	MediaWeight     int
 	MirrorPrint     bool
 	NegativePrint   bool
-	NumCopies       uint32
+	NumCopies       int
 	Orientation     int
 	OutputFaceUp    bool
-	Width           uint32
-	Length          uint32
+	Width           int
+	Length          int
 	Separations     bool
 	TraySwitch      bool
 	Tumble          bool
@@ -151,25 +151,25 @@ type Header struct {
 
 type CUPSHeader struct {
 	// v1
-	Width        uint32
-	Height       uint32
-	MediaType    uint32
-	BitsPerColor uint32
-	BitsPerPixel uint32
-	BytesPerLine uint32
+	Width        int
+	Height       int
+	MediaType    int
+	BitsPerColor int
+	BitsPerPixel int
+	BytesPerLine int
 	ColorOrder   int
 	ColorSpace   int
-	Compression  uint32
-	RowCount     uint32
-	RowFeed      uint32
-	RowStep      uint32
+	Compression  int
+	RowCount     int
+	RowFeed      int
+	RowStep      int
 
 	// v2, v3
-	NumColors               uint32
+	NumColors               int
 	BorderlessScalingFactor float32
 	PageSize                [2]float32
 	ImagingBBox             CUPSBoundingBox
-	Integer                 [16]uint32
+	Integer                 [16]int
 	Real                    [16]float32
 	String                  [16]string
 	MarkerType              string
@@ -254,11 +254,11 @@ func (p *Page) parseColorsCMYK(b []byte) ([]color.Color, error) {
 }
 
 // LineSize returns the size of a single line, in bytes.
-func (p *Page) LineSize() uint32 {
+func (p *Page) LineSize() int {
 	return p.Header.CUPS.BytesPerLine
 }
 
 // TotalSize returns the size of the entire page, in bytes.
-func (p *Page) TotalSize() uint32 {
+func (p *Page) TotalSize() int {
 	return p.Header.CUPS.Height * p.Header.CUPS.BytesPerLine
 }

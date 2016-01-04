@@ -163,7 +163,7 @@ func (p *Page) discard() error {
 // io.EOF if no more lines can be read. The buffer b must be at least
 // p.Header.CUPSBytesPerLine bytes large.
 func (p *Page) ReadLine(b []byte) error {
-	if int64(len(b)) < int64(p.Header.CUPS.BytesPerLine) {
+	if len(b) < p.Header.CUPS.BytesPerLine {
 		return ErrBufferTooSmall
 	}
 	if p.UnreadLines() == 0 {
@@ -281,7 +281,7 @@ func (p *Page) ReadAll(b []byte) error {
 	if n == 0 {
 		return io.EOF
 	}
-	for i := uint32(0); i < uint32(n); i++ {
+	for i := 0; i < n; i++ {
 		start := i * p.Header.CUPS.BytesPerLine
 		end := start + p.Header.CUPS.BytesPerLine
 		err := p.ReadLine(b[start:end:end])
@@ -301,7 +301,7 @@ func (p *Page) ReadAll(b []byte) error {
 // scratch space and must be at least p.Header.CUPSBytesPerLine bytes
 // large.
 func (p *Page) ReadAllColors(b []byte) ([]color.Color, error) {
-	if int64(len(b)) < int64(p.Header.CUPS.BytesPerLine) {
+	if len(b) < p.Header.CUPS.BytesPerLine {
 		return nil, ErrBufferTooSmall
 	}
 	n := p.UnreadLines()
@@ -363,14 +363,19 @@ func (d *Decoder) readBool() bool {
 
 func (d *Decoder) decodeV1Header() (*Header, error) {
 	data := struct {
-		AdvanceDistance  uint32
-		AdvanceMedia     uint32
-		Collate          uint32
-		CutMedia         uint32
-		Duplex           uint32
-		HorizDPI         uint32
-		VertDPI          uint32
-		BoundingBox      BoundingBox
+		AdvanceDistance uint32
+		AdvanceMedia    uint32
+		Collate         uint32
+		CutMedia        uint32
+		Duplex          uint32
+		HorizDPI        uint32
+		VertDPI         uint32
+		BoundingBox     struct {
+			Left   uint32
+			Bottom uint32
+			Right  uint32
+			Top    uint32
+		}
 		InsertSheet      uint32
 		Jog              uint32
 		LeadingEdge      uint32
@@ -414,44 +419,47 @@ func (d *Decoder) decodeV1Header() (*Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	h.AdvanceDistance = data.AdvanceDistance
+	h.AdvanceDistance = int(data.AdvanceDistance)
 	h.AdvanceMedia = int(data.AdvanceMedia)
 	h.Collate = data.Collate == 1
 	h.CutMedia = int(data.CutMedia)
 	h.Duplex = data.Duplex == 1
-	h.HorizDPI = data.HorizDPI
-	h.VertDPI = data.VertDPI
-	h.BoundingBox = data.BoundingBox
+	h.HorizDPI = int(data.HorizDPI)
+	h.VertDPI = int(data.VertDPI)
+	h.BoundingBox.Left = int(data.BoundingBox.Left)
+	h.BoundingBox.Bottom = int(data.BoundingBox.Bottom)
+	h.BoundingBox.Right = int(data.BoundingBox.Right)
+	h.BoundingBox.Top = int(data.BoundingBox.Top)
 	h.InsertSheet = data.InsertSheet == 1
 	h.Jog = int(data.Jog)
 	h.LeadingEdge = int(data.LeadingEdge)
-	h.MarginLeft = data.MarginLeft
-	h.MarginBottom = data.MarginBottom
+	h.MarginLeft = int(data.MarginLeft)
+	h.MarginBottom = int(data.MarginBottom)
 	h.ManualFeed = data.ManualFeed == 1
-	h.MediaPosition = data.MediaPosition
-	h.MediaWeight = data.MediaWeight
+	h.MediaPosition = int(data.MediaPosition)
+	h.MediaWeight = int(data.MediaWeight)
 	h.MirrorPrint = data.MirrorPrint == 1
 	h.NegativePrint = data.NegativePrint == 1
-	h.NumCopies = data.NumCopies
+	h.NumCopies = int(data.NumCopies)
 	h.Orientation = int(data.Orientation)
 	h.OutputFaceUp = data.OutputFaceUp == 1
-	h.Width = data.Width
-	h.Length = data.Length
+	h.Width = int(data.Width)
+	h.Length = int(data.Length)
 	h.Separations = data.Separations == 1
 	h.TraySwitch = data.TraySwitch == 1
 	h.Tumble = data.Tumble == 1
-	h.CUPS.Width = data.CUPSWidth
-	h.CUPS.Height = data.CUPSHeight
-	h.CUPS.MediaType = data.CUPSMediaType
-	h.CUPS.BitsPerColor = data.CUPSBitsPerColor
-	h.CUPS.BitsPerPixel = data.CUPSBitsPerPixel
-	h.CUPS.BytesPerLine = data.CUPSBytesPerLine
+	h.CUPS.Width = int(data.CUPSWidth)
+	h.CUPS.Height = int(data.CUPSHeight)
+	h.CUPS.MediaType = int(data.CUPSMediaType)
+	h.CUPS.BitsPerColor = int(data.CUPSBitsPerColor)
+	h.CUPS.BitsPerPixel = int(data.CUPSBitsPerPixel)
+	h.CUPS.BytesPerLine = int(data.CUPSBytesPerLine)
 	h.CUPS.ColorOrder = int(data.CUPSColorOrder)
 	h.CUPS.ColorSpace = int(data.CUPSColorSpace)
-	h.CUPS.Compression = data.CUPSCompression
-	h.CUPS.RowCount = data.CUPSRowCount
-	h.CUPS.RowFeed = data.CUPSRowFeed
-	h.CUPS.RowStep = data.CUPSRowStep
+	h.CUPS.Compression = int(data.CUPSCompression)
+	h.CUPS.RowCount = int(data.CUPSRowCount)
+	h.CUPS.RowFeed = int(data.CUPSRowFeed)
+	h.CUPS.RowStep = int(data.CUPSRowStep)
 
 	return &h, d.err
 }
@@ -475,11 +483,15 @@ func (d *Decoder) decodeV2Header() (*Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	h.CUPS.NumColors = data.CUPSNumColors
+	h.CUPS.NumColors = int(data.CUPSNumColors)
 	h.CUPS.BorderlessScalingFactor = data.CUPSBorderlessScalingFactor
 	h.CUPS.PageSize = data.CUPSPageSize
 	h.CUPS.ImagingBBox = data.CUPSImagingBBox
-	h.CUPS.Integer = data.CUPSInteger
+	var ints [16]int
+	for i, v := range data.CUPSInteger {
+		ints[i] = int(v)
+	}
+	h.CUPS.Integer = ints
 	h.CUPS.Real = data.CUPSReal
 
 	for i := range h.CUPS.String {
