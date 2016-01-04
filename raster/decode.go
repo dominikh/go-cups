@@ -9,6 +9,7 @@ import (
 
 var ErrUnsupported = errors.New("unsupported file format")
 var ErrUnknownColorOrder = errors.New("unknown color order")
+var ErrBufferTooSmall = errors.New("buffer too small")
 
 const (
 	syncV1BE = "RaSt"
@@ -123,7 +124,7 @@ func (d *Decoder) NextPage() (*Page, error) {
 // slice will only be valid until the next call to ReadLine.
 func (p *Page) ReadLine(b []byte) (err error) {
 	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
-		panic("buffer to Page.ReadLine is too small")
+		return ErrBufferTooSmall
 	}
 	if p.lineRep > 0 {
 		p.lineRep--
@@ -182,7 +183,7 @@ func (p *Page) ReadLine(b []byte) (err error) {
 
 func (p *Page) ReadAll(b []byte) error {
 	if uint64(len(b)) < uint64(p.TotalSize()) {
-		panic("buffer to Page.ReadAll is too small")
+		return ErrBufferTooSmall
 	}
 	for i := uint32(0); i < p.Header.CUPSHeight; i++ {
 		start := i * p.Header.CUPSBytesPerLine
