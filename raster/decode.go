@@ -79,7 +79,7 @@ func NewDecoder(r io.Reader) (*Decoder, error) {
 }
 
 type Page struct {
-	Header  *PageHeader
+	Header  *Header
 	dec     *Decoder
 	line    []byte
 	color   []byte
@@ -93,7 +93,7 @@ type Page struct {
 func (d *Decoder) NextPage() (*Page, error) {
 	// TODO if the user didn't read all lines, skip over them
 	var err error
-	var h *PageHeader
+	var h *Header
 
 	n := d.r.n
 	switch d.version {
@@ -273,7 +273,7 @@ func (d *Decoder) readBool() bool {
 	return d.readUint() == 1
 }
 
-func (d *Decoder) decodeV1Header() (*PageHeader, error) {
+func (d *Decoder) decodeV1Header() (*Header, error) {
 	data := struct {
 		AdvanceDistance  uint32
 		AdvanceMedia     uint32
@@ -315,7 +315,7 @@ func (d *Decoder) decodeV1Header() (*PageHeader, error) {
 		CUPSRowStep      uint32
 	}{}
 
-	h := PageHeader{}
+	h := Header{}
 	h.MediaClass = d.readCString()
 	h.MediaColor = d.readCString()
 	h.MediaType = d.readCString()
@@ -368,7 +368,7 @@ func (d *Decoder) decodeV1Header() (*PageHeader, error) {
 	return &h, d.err
 }
 
-func (d *Decoder) decodeV2Header() (*PageHeader, error) {
+func (d *Decoder) decodeV2Header() (*Header, error) {
 	h, err := d.decodeV1Header()
 	if err != nil {
 		return nil, err
@@ -404,7 +404,7 @@ func (d *Decoder) decodeV2Header() (*PageHeader, error) {
 	return h, d.err
 }
 
-func bytesPerColor(h *PageHeader) (int, error) {
+func bytesPerColor(h *Header) (int, error) {
 	switch h.CUPSColorOrder {
 	case ChunkyPixels:
 		return int(h.CUPSBitsPerPixel+7) / 8, nil

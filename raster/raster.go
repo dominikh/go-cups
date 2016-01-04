@@ -111,7 +111,7 @@ type CUPSBoundingBox struct {
 	Top    float32
 }
 
-type PageHeader struct {
+type Header struct {
 	// v1
 
 	MediaClass       string
