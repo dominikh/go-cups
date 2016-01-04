@@ -129,12 +129,11 @@ func (p *Page) ReadLine(b []byte) error {
 
 	switch p.dec.version {
 	case 1:
-		// TODO implement
-		return ErrUnsupported
+		return p.readRawLine(b)
 	case 2:
 		return p.readV2Line(b)
 	case 3:
-		return p.readV3Line(b)
+		return p.readRawLine(b)
 	default:
 		return ErrUnsupported
 	}
@@ -196,7 +195,7 @@ func (p *Page) readV2Line(b []byte) (err error) {
 	return nil
 }
 
-func (p *Page) readV3Line(b []byte) error {
+func (p *Page) readRawLine(b []byte) error {
 	b = b[:p.Header.CUPSBytesPerLine]
 	_, err := io.ReadFull(p.dec.r, b)
 	return err
