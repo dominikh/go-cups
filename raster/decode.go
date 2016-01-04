@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"image/color"
 	"io"
 	"io/ioutil"
 )
@@ -159,7 +160,8 @@ func (p *Page) discard() error {
 }
 
 // ReadLine returns the next line of pixels in the image. It returns
-// io.EOF if no more lines can be read.
+// io.EOF if no more lines can be read. The buffer b must be at least
+// p.Header.CUPSBytesPerLine bytes large.
 func (p *Page) ReadLine(b []byte) error {
 	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
 		return ErrBufferTooSmall
@@ -179,6 +181,26 @@ func (p *Page) ReadLine(b []byte) error {
 		// can't happen, NewDecoder rejects unknown versions
 		panic("impossible")
 	}
+}
+
+// ReadLineColors reads a line and returns the color for each pixel.
+// Unlike using ReadLine and ParseColors, this function will not
+// return more values than there are pixels in a line. b is used as
+// scratch space and must be at least p.Header.CUPSBytesPerLine bytes
+// large.
+func (p *Page) ReadLineColors(b []byte) ([]color.Color, error) {
+	err := p.ReadLine(b)
+	if err != nil {
+		return nil, err
+	}
+	colors, err := p.ParseColors(b)
+	if err != nil {
+		return colors, err
+	}
+	if len(colors) > int(p.Header.CUPSWidth) {
+		colors = colors[:p.Header.CUPSWidth]
+	}
+	return colors, nil
 }
 
 func (p *Page) readV2Line(b []byte) (err error) {
@@ -271,6 +293,33 @@ func (p *Page) ReadAll(b []byte) error {
 		}
 	}
 	return nil
+}
+
+// ReadAllColors reads the page and returns the color for each pixel.
+// Unlike using ReadAll and ParseColors, this function will not
+// return more values than there are pixels in a page. b is used as
+// scratch space and must be at least p.Header.CUPSBytesPerLine bytes
+// large.
+func (p *Page) ReadAllColors(b []byte) ([]color.Color, error) {
+	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
+		return nil, ErrBufferTooSmall
+	}
+	n := p.UnreadLines()
+	if n == 0 {
+		return nil, io.EOF
+	}
+	var out []color.Color
+	for i := 0; i < n; i++ {
+		colors, err := p.ReadLineColors(b)
+		if err == io.EOF {
+			return out, io.ErrUnexpectedEOF
+		}
+		if err != nil {
+			return out, err
+		}
+		out = append(out, colors...)
+	}
+	return out, nil
 }
 
 func cstring(b []byte) string {
