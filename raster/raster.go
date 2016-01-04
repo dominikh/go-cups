@@ -116,60 +116,65 @@ type CUPSBoundingBox struct {
 type Header struct {
 	// v1
 
-	MediaClass       string
-	MediaColor       string
-	MediaType        string
-	OutputType       string
-	AdvanceDistance  uint32
-	AdvanceMedia     int
-	Collate          bool
-	CutMedia         int
-	Duplex           bool
-	HorizDPI         uint32
-	VertDPI          uint32
-	BoundingBox      BoundingBox
-	InsertSheet      bool
-	Jog              int
-	LeadingEdge      int
-	MarginLeft       uint32
-	MarginBottom     uint32
-	ManualFeed       bool
-	MediaPosition    uint32
-	MediaWeight      uint32
-	MirrorPrint      bool
-	NegativePrint    bool
-	NumCopies        uint32
-	Orientation      int
-	OutputFaceUp     bool
-	Width            uint32
-	Length           uint32
-	Separations      bool
-	TraySwitch       bool
-	Tumble           bool
-	CUPSWidth        uint32
-	CUPSHeight       uint32
-	CUPSMediaType    uint32
-	CUPSBitsPerColor uint32
-	CUPSBitsPerPixel uint32
-	CUPSBytesPerLine uint32
-	CUPSColorOrder   int
-	CUPSColorSpace   int
-	CUPSCompression  uint32
-	CUPSRowCount     uint32
-	CUPSRowFeed      uint32
-	CUPSRowStep      uint32
+	MediaClass      string
+	MediaColor      string
+	MediaType       string
+	OutputType      string
+	AdvanceDistance uint32
+	AdvanceMedia    int
+	Collate         bool
+	CutMedia        int
+	Duplex          bool
+	HorizDPI        uint32
+	VertDPI         uint32
+	BoundingBox     BoundingBox
+	InsertSheet     bool
+	Jog             int
+	LeadingEdge     int
+	MarginLeft      uint32
+	MarginBottom    uint32
+	ManualFeed      bool
+	MediaPosition   uint32
+	MediaWeight     uint32
+	MirrorPrint     bool
+	NegativePrint   bool
+	NumCopies       uint32
+	Orientation     int
+	OutputFaceUp    bool
+	Width           uint32
+	Length          uint32
+	Separations     bool
+	TraySwitch      bool
+	Tumble          bool
+	CUPS            CUPSHeader
+}
+
+type CUPSHeader struct {
+	// v1
+	Width        uint32
+	Height       uint32
+	MediaType    uint32
+	BitsPerColor uint32
+	BitsPerPixel uint32
+	BytesPerLine uint32
+	ColorOrder   int
+	ColorSpace   int
+	Compression  uint32
+	RowCount     uint32
+	RowFeed      uint32
+	RowStep      uint32
 
 	// v2, v3
-	CUPSNumColors               uint32
-	CUPSBorderlessScalingFactor float32
-	CUPSPageSize                [2]float32
-	CUPSImagingBBox             CUPSBoundingBox
-	CUPSInteger                 [16]uint32
-	CUPSReal                    [16]float32
-	CUPSString                  [16]string
-	CUPSMarkerType              string
-	CUPSRenderingIntent         string
-	CUPSPageSizeName            string
+	NumColors               uint32
+	BorderlessScalingFactor float32
+	PageSize                [2]float32
+	ImagingBBox             CUPSBoundingBox
+	Integer                 [16]uint32
+	Real                    [16]float32
+	String                  [16]string
+	MarkerType              string
+	RenderingIntent         string
+	PageSizeName            string
 }
 
 // ParseColors parses b and returns the colors stored in it, one per
@@ -194,10 +199,10 @@ type Header struct {
 // needed.
 func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 	// TODO support banded and planar
-	if p.Header.CUPSColorOrder != ChunkyPixels {
+	if p.Header.CUPS.ColorOrder != ChunkyPixels {
 		return nil, ErrUnsupported
 	}
-	switch p.Header.CUPSColorSpace {
+	switch p.Header.CUPS.ColorSpace {
 	case ColorSpaceBlack:
 		return p.parseColorsBlack(b)
 	case ColorSpaceCMYK:
@@ -210,7 +215,7 @@ func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 func (p *Page) parseColorsBlack(b []byte) ([]color.Color, error) {
 	// TODO support all depths
 	var colors []color.Color
-	switch p.Header.CUPSBitsPerColor {
+	switch p.Header.CUPS.BitsPerColor {
 	case 1:
 		for _, packet := range b {
 			for i := uint(0); i < 8; i++ {
@@ -232,7 +237,7 @@ func (p *Page) parseColorsBlack(b []byte) ([]color.Color, error) {
 }
 
 func (p *Page) parseColorsCMYK(b []byte) ([]color.Color, error) {
-	if p.Header.CUPSBitsPerColor != 8 {
+	if p.Header.CUPS.BitsPerColor != 8 {
 		return nil, ErrUnsupported
 	}
 	if len(b)%4 != 0 || len(b) < 4 {
@@ -250,10 +255,10 @@ func (p *Page) parseColorsCMYK(b []byte) ([]color.Color, error) {
 
 // LineSize returns the size of a single line, in bytes.
 func (p *Page) LineSize() uint32 {
-	return p.Header.CUPSBytesPerLine
+	return p.Header.CUPS.BytesPerLine
 }
 
 // TotalSize returns the size of the entire page, in bytes.
 func (p *Page) TotalSize() uint32 {
-	return p.Header.CUPSHeight * p.Header.CUPSBytesPerLine
+	return p.Header.CUPS.Height * p.Header.CUPS.BytesPerLine
 }

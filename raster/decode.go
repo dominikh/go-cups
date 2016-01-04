@@ -142,7 +142,7 @@ func (d *Decoder) NextPage() (*Page, error) {
 	p := &Page{
 		Header: h,
 		dec:    d,
-		line:   make([]byte, 0, h.CUPSBytesPerLine),
+		line:   make([]byte, 0, h.CUPS.BytesPerLine),
 		color:  make([]byte, bpc),
 	}
 	d.curPage = p
@@ -163,7 +163,7 @@ func (p *Page) discard() error {
 // io.EOF if no more lines can be read. The buffer b must be at least
 // p.Header.CUPSBytesPerLine bytes large.
 func (p *Page) ReadLine(b []byte) error {
-	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
+	if int64(len(b)) < int64(p.Header.CUPS.BytesPerLine) {
 		return ErrBufferTooSmall
 	}
 	if p.UnreadLines() == 0 {
@@ -197,8 +197,8 @@ func (p *Page) ReadLineColors(b []byte) ([]color.Color, error) {
 	if err != nil {
 		return colors, err
 	}
-	if len(colors) > int(p.Header.CUPSWidth) {
-		colors = colors[:p.Header.CUPSWidth]
+	if len(colors) > int(p.Header.CUPS.Width) {
+		colors = colors[:p.Header.CUPS.Width]
 	}
 	return colors, nil
 }
@@ -226,7 +226,7 @@ func (p *Page) readV2Line(b []byte) (err error) {
 	// first line, anyway.
 	p.lineRep = int(lineRep)
 
-	for len(p.line) < int(p.Header.CUPSBytesPerLine) {
+	for len(p.line) < int(p.Header.CUPS.BytesPerLine) {
 		var n byte
 		err := binary.Read(p.dec.r, p.dec.bo, &n)
 		if err != nil {
@@ -260,14 +260,14 @@ func (p *Page) readV2Line(b []byte) (err error) {
 }
 
 func (p *Page) readRawLine(b []byte) error {
-	b = b[:p.Header.CUPSBytesPerLine]
+	b = b[:p.Header.CUPS.BytesPerLine]
 	_, err := io.ReadFull(p.dec.r, b)
 	return err
 }
 
 // UnreadLines returns the number of unread lines in the page.
 func (p *Page) UnreadLines() int {
-	return int(p.Header.CUPSHeight) - p.linesRead
+	return int(p.Header.CUPS.Height) - p.linesRead
 }
 
 // ReadAll reads the entire page into b. If ReadLine has been called
@@ -282,8 +282,8 @@ func (p *Page) ReadAll(b []byte) error {
 		return io.EOF
 	}
 	for i := uint32(0); i < uint32(n); i++ {
-		start := i * p.Header.CUPSBytesPerLine
-		end := start + p.Header.CUPSBytesPerLine
+		start := i * p.Header.CUPS.BytesPerLine
+		end := start + p.Header.CUPS.BytesPerLine
 		err := p.ReadLine(b[start:end:end])
 		if err == io.EOF {
 			return io.ErrUnexpectedEOF
@@ -301,7 +301,7 @@ func (p *Page) ReadAll(b []byte) error {
 // scratch space and must be at least p.Header.CUPSBytesPerLine bytes
 // large.
 func (p *Page) ReadAllColors(b []byte) ([]color.Color, error) {
-	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
+	if int64(len(b)) < int64(p.Header.CUPS.BytesPerLine) {
 		return nil, ErrBufferTooSmall
 	}
 	n := p.UnreadLines()
@@ -440,18 +440,18 @@ func (d *Decoder) decodeV1Header() (*Header, error) {
 	h.Separations = data.Separations == 1
 	h.TraySwitch = data.TraySwitch == 1
 	h.Tumble = data.Tumble == 1
-	h.CUPSWidth = data.CUPSWidth
-	h.CUPSHeight = data.CUPSHeight
-	h.CUPSMediaType = data.CUPSMediaType
-	h.CUPSBitsPerColor = data.CUPSBitsPerColor
-	h.CUPSBitsPerPixel = data.CUPSBitsPerPixel
-	h.CUPSBytesPerLine = data.CUPSBytesPerLine
-	h.CUPSColorOrder = int(data.CUPSColorOrder)
-	h.CUPSColorSpace = int(data.CUPSColorSpace)
-	h.CUPSCompression = data.CUPSCompression
-	h.CUPSRowCount = data.CUPSRowCount
-	h.CUPSRowFeed = data.CUPSRowFeed
-	h.CUPSRowStep = data.CUPSRowStep
+	h.CUPS.Width = data.CUPSWidth
+	h.CUPS.Height = data.CUPSHeight
+	h.CUPS.MediaType = data.CUPSMediaType
+	h.CUPS.BitsPerColor = data.CUPSBitsPerColor
+	h.CUPS.BitsPerPixel = data.CUPSBitsPerPixel
+	h.CUPS.BytesPerLine = data.CUPSBytesPerLine
+	h.CUPS.ColorOrder = int(data.CUPSColorOrder)
+	h.CUPS.ColorSpace = int(data.CUPSColorSpace)
+	h.CUPS.Compression = data.CUPSCompression
+	h.CUPS.RowCount = data.CUPSRowCount
+	h.CUPS.RowFeed = data.CUPSRowFeed
+	h.CUPS.RowStep = data.CUPSRowStep
 
 	return &h, d.err
 }
@@ -475,29 +475,29 @@ func (d *Decoder) decodeV2Header() (*Header, error) {
 	if err != nil {
 		return nil, err
 	}
-	h.CUPSNumColors = data.CUPSNumColors
-	h.CUPSBorderlessScalingFactor = data.CUPSBorderlessScalingFactor
-	h.CUPSPageSize = data.CUPSPageSize
-	h.CUPSImagingBBox = data.CUPSImagingBBox
-	h.CUPSInteger = data.CUPSInteger
-	h.CUPSReal = data.CUPSReal
+	h.CUPS.NumColors = data.CUPSNumColors
+	h.CUPS.BorderlessScalingFactor = data.CUPSBorderlessScalingFactor
+	h.CUPS.PageSize = data.CUPSPageSize
+	h.CUPS.ImagingBBox = data.CUPSImagingBBox
+	h.CUPS.Integer = data.CUPSInteger
+	h.CUPS.Real = data.CUPSReal
 
-	for i := range h.CUPSString {
-		h.CUPSString[i] = d.readCString()
+	for i := range h.CUPS.String {
+		h.CUPS.String[i] = d.readCString()
 	}
-	h.CUPSMarkerType = d.readCString()
-	h.CUPSRenderingIntent = d.readCString()
-	h.CUPSPageSizeName = d.readCString()
+	h.CUPS.MarkerType = d.readCString()
+	h.CUPS.RenderingIntent = d.readCString()
+	h.CUPS.PageSizeName = d.readCString()
 
 	return h, d.err
 }
 
 func bytesPerColor(h *Header) (int, error) {
-	switch h.CUPSColorOrder {
+	switch h.CUPS.ColorOrder {
 	case ChunkyPixels:
-		return int(h.CUPSBitsPerPixel+7) / 8, nil
+		return int(h.CUPS.BitsPerPixel+7) / 8, nil
 	case BandedPixels, PlanarPixels:
-		return int(h.CUPSBitsPerColor+7) / 8, nil
+		return int(h.CUPS.BitsPerColor+7) / 8, nil
 	default:
 		// The versions that we support only know these 3 color orders
 		return 0, ErrInvalidFormat

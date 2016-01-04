@@ -13,7 +13,7 @@ import (
 
 func rect(p *raster.Page) image.Rectangle {
 	// TODO respect bounding box
-	return image.Rect(0, 0, int(p.Header.CUPSWidth), int(p.Header.CUPSHeight))
+	return image.Rect(0, 0, int(p.Header.CUPS.Width), int(p.Header.CUPS.Height))
 }
 
 // Image returns an image.Image of the page.
@@ -43,16 +43,16 @@ func Image(p *raster.Page) (image.Image, error) {
 	}
 
 	// FIXME support color orders other than chunked
-	if p.Header.CUPSColorOrder != raster.ChunkyPixels {
+	if p.Header.CUPS.ColorOrder != raster.ChunkyPixels {
 		return nil, raster.ErrUnsupported
 	}
-	switch p.Header.CUPSColorSpace {
+	switch p.Header.CUPS.ColorSpace {
 	case raster.ColorSpaceBlack:
-		switch p.Header.CUPSBitsPerColor {
+		switch p.Header.CUPS.BitsPerColor {
 		case 1:
 			return &Monochrome{
 				Pix:    b,
-				Stride: int(p.Header.CUPSBytesPerLine),
+				Stride: int(p.Header.CUPS.BytesPerLine),
 				Rect:   rect(p),
 			}, nil
 		case 8:
@@ -61,21 +61,21 @@ func Image(p *raster.Page) (image.Image, error) {
 			}
 			return &image.Gray{
 				Pix:    b,
-				Stride: int(p.Header.CUPSBytesPerLine),
+				Stride: int(p.Header.CUPS.BytesPerLine),
 				Rect:   rect(p),
 			}, nil
 		default:
 			return nil, raster.ErrUnsupported
 		}
 	case raster.ColorSpaceCMYK:
-		if p.Header.CUPSBitsPerColor != 8 {
+		if p.Header.CUPS.BitsPerColor != 8 {
 			return nil, raster.ErrUnsupported
 		}
 		// TODO does cups have a byte order for colors in a pixel and
 		// do we need to swap bytes?
 		return &image.CMYK{
 			Pix:    b,
-			Stride: int(p.Header.CUPSBytesPerLine),
+			Stride: int(p.Header.CUPS.BytesPerLine),
 			Rect:   rect(p),
 		}, nil
 	default:
