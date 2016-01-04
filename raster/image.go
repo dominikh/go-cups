@@ -72,6 +72,9 @@ func (p *Page) Image() (image.Image, error) {
 	}
 
 	// FIXME support color orders other than chunked
+	if p.Header.CUPSColorOrder != ChunkyPixels {
+		return nil, ErrUnsupported
+	}
 	switch p.Header.CUPSColorSpace {
 	case ColorSpaceBlack:
 		return &Monochrome{p: p, data: b}, nil
