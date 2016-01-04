@@ -83,6 +83,8 @@ func Image(p *raster.Page) (image.Image, error) {
 
 var _ image.Image = (*Monochrome)(nil)
 
+// Monochrome is an in-memory monochromatic image, with 8 pixels
+// packed into one byte. Its At method returns color.Gray values.
 type Monochrome struct {
 	Pix    []uint8
 	Stride int
