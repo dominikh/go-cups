@@ -122,10 +122,25 @@ func (d *Decoder) NextPage() (*Page, error) {
 
 // ReadLine returns the next line of pixels in the image. The returned
 // slice will only be valid until the next call to ReadLine.
-func (p *Page) ReadLine(b []byte) (err error) {
+func (p *Page) ReadLine(b []byte) error {
 	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
 		return ErrBufferTooSmall
 	}
+
+	switch p.dec.version {
+	case 1:
+		// TODO implement
+		return ErrUnsupported
+	case 2:
+		return p.readV2Line(b)
+	case 3:
+		return p.readV3Line(b)
+	default:
+		return ErrUnsupported
+	}
+}
+
+func (p *Page) readV2Line(b []byte) (err error) {
 	if p.lineRep > 0 {
 		p.lineRep--
 		copy(b, p.line)
@@ -179,6 +194,12 @@ func (p *Page) ReadLine(b []byte) (err error) {
 	}
 	copy(b, p.line)
 	return nil
+}
+
+func (p *Page) readV3Line(b []byte) error {
+	b = b[:p.Header.CUPSBytesPerLine]
+	_, err := io.ReadFull(p.dec.r, b)
+	return err
 }
 
 func (p *Page) ReadAll(b []byte) error {
