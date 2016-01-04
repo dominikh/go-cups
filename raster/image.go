@@ -4,7 +4,6 @@ import (
 	"image"
 	"image/color"
 	"io"
-	"io/ioutil"
 )
 
 func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
@@ -38,9 +37,6 @@ type ImageSetter interface {
 	Set(x, y int, c color.Color)
 }
 
-// TODO Instead of having a Render function, consider implementing an
-// image.Image based on the RLE byte data.
-
 // Render renders a CUPS raster image onto any image.Image that
 // implements the Set method.
 func (p *Page) Render(img ImageSetter) error {
@@ -65,129 +61,35 @@ func (p *Page) Render(img ImageSetter) error {
 }
 
 func (p *Page) Image() image.Image {
-	// FIXME this function is wrong in all ways imaginable
-	b, err := ioutil.ReadAll(p.dec.r)
-	if err != nil {
-		panic(err)
+	b := make([]byte, p.TotalSize())
+	_ = p.ReadAll(b)
+
+	// FIXME support color orders other than chunked
+	switch p.Header.CUPSColorSpace {
+	case ColorSpaceBlack:
+		return &Monochrome{p: p, data: b}
 	}
-	return &Image{p: p, data: b}
 }
 
-var _ image.Image = (*Image)(nil)
+var _ image.Image = (*Monochrome)(nil)
 
-type Image struct {
+type Monochrome struct {
 	p    *Page
 	data []byte
-	// y -> (x -> offset)
-	ys map[int]int
 }
 
-func (img *Image) populateCache() {
-	img.ys = map[int]int{}
-	// TODO support other color spaces
-	y := 0
-	off := 0
-	// FIXME deal with error
-	bpc, err := bytesPerColor(img.p.Header)
-	_ = err
-	for off < len(img.data) {
-		rep := int(img.data[off]) + 1
-		for i := 0; i < rep; i++ {
-			img.ys[y+i] = off + 1
-		}
-		y += rep
-		off++
-
-		x := 0
-		for uint32(x) < img.p.Header.CUPSWidth {
-			rep := int(img.data[off])
-			off++
-			if rep <= 127 {
-				// rep repeating colors
-				rep++
-				off += bpc
-			} else {
-				// rep non-repeating colors
-				rep = 257 - rep
-				off += rep * bpc
-			}
-			pixels := rep * ((bpc * 8) / int(img.p.Header.CUPSBitsPerPixel))
-			x += pixels
-		}
-	}
+func (img *Monochrome) ColorModel() color.Model {
+	return color.GrayModel
 }
 
-func (img *Image) ColorModel() color.Model {
-	switch img.p.Header.CUPSColorSpace {
-	case ColorSpaceBlack:
-		return color.Palette{color.Gray{Y: 0}, color.Gray{Y: 255}}
-	default:
-		// TODO panic?
-		return nil
-	}
+func (img *Monochrome) Bounds() image.Rectangle {
+	return image.Rect(0, 0, int(img.p.Header.CUPSWidth), int(img.p.Header.CUPSHeight))
 }
 
-func (img *Image) Bounds() image.Rectangle {
-	return image.Rectangle{
-		Min: image.Point{},
-		Max: image.Point{
-			X: int(img.p.Header.CUPSWidth),
-			Y: int(img.p.Header.CUPSHeight),
-		},
+func (img *Monochrome) At(x, y int) color.Color {
+	idx := y*int(img.p.Header.CUPSBytesPerLine) + (x / 8)
+	if img.data[idx]<<uint(x%8)&128 > 0 {
+		return color.Gray{Y: 0}
 	}
-}
-
-func (img *Image) At(x, y int) color.Color {
-	if img.p.Header.CUPSColorSpace != ColorSpaceBlack {
-		// TODO support other color spaces
-		return nil
-	}
-	if int64(x) >= int64(img.p.Header.CUPSWidth) ||
-		int64(y) >= int64(img.p.Header.CUPSHeight) {
-		return nil
-	}
-	if img.ys == nil {
-		img.populateCache()
-	}
-
-	off, ok := img.ys[y]
-	if !ok {
-		panic("invalid RLE cache")
-	}
-
-	// FIXME don't assume monochrome or chunked
-	ppc := 8
-	d := x / ppc
-	colors := 0
-	// FIXME deal with error
-	bpc, err := bytesPerColor(img.p.Header)
-	_ = err
-	for {
-		rep := int(img.data[off])
-		off++
-
-		b := -1
-		if rep <= 127 {
-			rep++
-			if d >= colors && d <= colors+rep {
-				b = int(img.data[off])
-			}
-			off += bpc
-		} else {
-			rep = 257 - rep
-			if d >= colors && d <= colors+rep {
-				b = int(img.data[off+(d-colors)*bpc])
-			}
-			off += rep * bpc
-		}
-		colors += rep
-		if b > -1 {
-			b := byte(b)
-			// FIXME don't assume monochrome or chunked
-			if b<<uint(x%8)&128 == 0 {
-				return color.Gray{Y: 255}
-			}
-			return color.Gray{Y: 0}
-		}
-	}
+	return color.Gray{Y: 255}
 }
