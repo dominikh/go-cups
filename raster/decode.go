@@ -122,7 +122,7 @@ func (d *Decoder) NextPage() (*Page, error) {
 // ReadLine returns the next line of pixels in the image. The returned
 // slice will only be valid until the next call to ReadLine.
 func (p *Page) ReadLine(b []byte) (err error) {
-	if len(b) < cap(p.line) {
+	if int64(len(b)) < int64(p.Header.CUPSBytesPerLine) {
 		panic("buffer to Page.ReadLine is too small")
 	}
 	if p.lineRep > 0 {
@@ -185,7 +185,9 @@ func (p *Page) ReadAll(b []byte) error {
 		panic("buffer to Page.ReadAll is too small")
 	}
 	for i := uint32(0); i < p.Header.CUPSHeight; i++ {
-		err := p.ReadLine(b[i*p.Header.CUPSBytesPerLine:])
+		start := i * p.Header.CUPSBytesPerLine
+		end := start + p.Header.CUPSBytesPerLine
+		err := p.ReadLine(b[start:end:end])
 		if err == io.EOF {
 			return io.ErrUnexpectedEOF
 		}
