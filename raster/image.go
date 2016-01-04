@@ -3,9 +3,18 @@ package raster
 import (
 	"image"
 	"image/color"
-	"io"
 )
 
+// FIXME respect bounding boxes
+
+// ParseColors parses b and returns the colors stored in it, one per
+// pixel.
+//
+// It currently supports the following color spaces and bit depths,
+// although more might be added later:
+//
+// - 1-bit, ColorSpaceBlack -> color.Gray
+// - 8-bit, ColorSpaceCMYK -> color.CMYK
 func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 	// TODO support banded and planar
 	if p.Header.CUPSColorOrder != ChunkyPixels {
@@ -23,6 +32,7 @@ func (p *Page) ParseColors(b []byte) ([]color.Color, error) {
 
 func (p *Page) parseColorsBlack(b []byte) ([]color.Color, error) {
 	if p.Header.CUPSBitsPerColor != 1 {
+		// TODO support all depths
 		return nil, ErrUnsupported
 	}
 	var colors []color.Color
@@ -59,6 +69,24 @@ func (p *Page) rect() image.Rectangle {
 	return image.Rect(0, 0, int(p.Header.CUPSWidth), int(p.Header.CUPSHeight))
 }
 
+// Image returns an image.Image of the page.
+//
+// Depending on the color space and bit depth used, image.Image
+// implementations from this package or from the Go standard library
+// image package may be used. The mapping is as follows:
+//
+// - 1-bit, ColorSpaceBlack -> *Monochrome
+// - 8-bit, ColorSpaceCMYK -> *image.CMYK
+// - Other combinations are not currently supported and will return
+//   ErrUnsupported. They might be added in the future.
+//
+// No calls to ReadLine or ReadAll must be made before or after
+// calling Image. That is, Image consumes the entire stream of the
+// current page.
+//
+// Note that decoding an entire page at once may use considerable
+// amounts of memory. For efficient, line-wise processing, a
+// combination of ReadLine and ParseColors should be used instead.
 func (p *Page) Image() (image.Image, error) {
 	b := make([]byte, p.TotalSize())
 	err := p.ReadAll(b)
