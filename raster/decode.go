@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"io/ioutil"
 )
 
 var (
@@ -77,6 +78,7 @@ type Decoder struct {
 	bo      binary.ByteOrder
 	err     error
 	version int
+	curPage *Page
 }
 
 func NewDecoder(r io.Reader) (*Decoder, error) {
@@ -95,11 +97,12 @@ func NewDecoder(r io.Reader) (*Decoder, error) {
 }
 
 type Page struct {
-	Header  *Header
-	dec     *Decoder
-	line    []byte
-	color   []byte
-	lineRep int
+	Header    *Header
+	dec       *Decoder
+	line      []byte
+	color     []byte
+	lineRep   int
+	linesRead int
 }
 
 // NextPage returns the next page in the raster stream. After a call
@@ -107,7 +110,11 @@ type Page struct {
 // be used to decode image data anymore. Their header data, however,
 // remains valid.
 func (d *Decoder) NextPage() (*Page, error) {
-	// TODO if the user didn't read all lines, skip over them
+	if d.curPage != nil {
+		if err := d.curPage.discard(); err != nil {
+			return nil, err
+		}
+	}
 	var err error
 	var h *Header
 
@@ -137,7 +144,18 @@ func (d *Decoder) NextPage() (*Page, error) {
 		line:   make([]byte, 0, h.CUPSBytesPerLine),
 		color:  make([]byte, bpc),
 	}
+	d.curPage = p
 	return p, nil
+}
+
+func (p *Page) discard() error {
+	n := p.UnreadLines() * int(p.LineSize())
+	r := io.LimitReader(p.dec.r, int64(n))
+	_, err := io.Copy(ioutil.Discard, r)
+	if err == io.EOF {
+		return io.ErrUnexpectedEOF
+	}
+	return err
 }
 
 // ReadLine returns the next line of pixels in the image.
@@ -146,6 +164,7 @@ func (p *Page) ReadLine(b []byte) error {
 		return ErrBufferTooSmall
 	}
 
+	p.linesRead++
 	switch p.dec.version {
 	case 1:
 		return p.readRawLine(b)
@@ -221,14 +240,19 @@ func (p *Page) readRawLine(b []byte) error {
 	return err
 }
 
-// ReadAll reads the entire page into b.
+// UnreadLines returns the number of unread lines in the page.
+func (p *Page) UnreadLines() int {
+	return int(p.Header.CUPSHeight) - p.linesRead
+}
+
+// ReadAll reads the entire page into b. If ReadLine has been called
+// previously, ReadAll will read the remainder of the page.
 func (p *Page) ReadAll(b []byte) error {
-	// TODO If ReadLine has been called previously, ReadAll will read
-	// the remainder of the page.
-	if uint64(len(b)) < uint64(p.TotalSize()) {
+	if len(b) < int(p.LineSize())*p.UnreadLines() {
 		return ErrBufferTooSmall
 	}
-	for i := uint32(0); i < p.Header.CUPSHeight; i++ {
+	n := p.UnreadLines()
+	for i := uint32(0); i < uint32(n); i++ {
 		start := i * p.Header.CUPSBytesPerLine
 		end := start + p.Header.CUPSBytesPerLine
 		err := p.ReadLine(b[start:end:end])
