@@ -132,9 +132,6 @@ loop:
 				depth--
 			}
 			if depth == 0 {
-				if len(s) == i {
-					return s[:i], ""
-				}
 				return s[:i+1], s[i+1:]
 			}
 		case '\\':
