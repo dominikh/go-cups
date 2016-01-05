@@ -52,7 +52,7 @@ func TestSkipSpace(t *testing.T) {
 	}
 }
 
-func TestStrings(t *testing.T) {
+func TestParseString(t *testing.T) {
 	var tests = []struct {
 		in        string
 		match     string
@@ -74,11 +74,13 @@ func TestStrings(t *testing.T) {
 		{`"\1705"`, `x5`, ``, true, true},
 		{`"!@#$%"`, `!@#$%`, ``, true, true},
 		{`"test"moredata`, `test`, `moredata`, true, true},
+		{`"\999"`, `999`, ``, true, true},
 		{`test`, ``, ``, true, false},
 		{`"test`, ``, ``, true, false},
 		{``, ``, ``, true, false},
 		{`"\27"`, ``, ``, true, false},
 		{"'\x00'", ``, ``, true, false},
+		{`"`, ``, ``, true, false},
 
 		// Unquoted
 		{`test`, `test`, ``, false, true},
@@ -143,6 +145,8 @@ func TestParseNumber(t *testing.T) {
 		{"+123", 123, true},
 		{"123_", 0, false},
 		{"foo", 0, false},
+		{"", 0, false},
+		{"12-3", 0, false},
 	}
 
 	for _, tt := range tests {
@@ -191,6 +195,7 @@ func TestParseResolution(t *testing.T) {
 		{"300dpx", Resolution{}, false},
 		{"300x300x300dpi", Resolution{}, false},
 		{"-300dpi", Resolution{}, false},
+		{"dpi", Resolution{}, false},
 	}
 
 	for _, tt := range tests {
@@ -212,6 +217,9 @@ func TestParseDate(t *testing.T) {
 		{"20020904", time.Date(2002, 9, 4, 0, 0, 0, 0, time.UTC), true},
 		{"200209041234", time.Date(2002, 9, 4, 12, 34, 0, 0, time.UTC), true},
 		{"20020904123456", time.Date(2002, 9, 4, 12, 34, 56, 0, time.UTC), true},
+
+		{"9999", time.Time{}, false},
+		{"999", time.Time{}, false},
 	}
 
 	for _, tt := range tests {
@@ -229,6 +237,8 @@ func TestParseOptions(t *testing.T) {
 		out []Option
 		ok  bool
 	}{
+		{"", nil, true},
+		{"  ", nil, true},
 		{
 			"foo=false",
 			[]Option{{"foo", []string{"false"}}},
@@ -362,6 +372,21 @@ func TestParseOptions(t *testing.T) {
 		{
 			`{foo="b\"ar}"}`,
 			[]Option{{"foo", []string{`b"ar}`}}},
+			true,
+		},
+		{
+			`field={foo="bar}"}`,
+			[]Option{{"field", []string{`{foo="bar}"}`}}},
+			true,
+		},
+		{
+			`field={foo="{bar}}"}`,
+			[]Option{{"field", []string{`{foo="{bar}}"}`}}},
+			true,
+		},
+		{
+			`field={foo="b\"ar}"}`,
+			[]Option{{"field", []string{`{foo="b\"ar}"}`}}},
 			true,
 		},
 
