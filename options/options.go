@@ -30,18 +30,17 @@ type Option struct {
 	Values []string
 }
 
-func ParseOptions(s string) ([]Option, bool) {
+func ParseOptions(s string) (v []Option, ok bool) {
 	if len(s) == 0 {
 		return nil, true
 	}
 	if len(s) >= 2 && s[0] == '{' && s[len(s)-1] == '}' {
 		s = s[1 : len(s)-1]
 	}
-	var options []Option
 	var option Option
 	for len(s) > 0 {
 		if option.Name != "" {
-			options = append(options, option)
+			v = append(v, option)
 			option = Option{}
 		}
 		var name string
@@ -79,16 +78,16 @@ func ParseOptions(s string) ([]Option, bool) {
 			}
 		} else {
 			if option.Name != "" {
-				options = append(options, option)
+				v = append(v, option)
 				option = Option{}
 			}
 		}
 	}
 	if option.Name != "" {
-		options = append(options, option)
+		v = append(v, option)
 		option = Option{}
 	}
-	return options, true
+	return v, true
 }
 
 func parseValue(s string) (value string, remainder string) {
@@ -166,14 +165,18 @@ func parseOctal(s string) (string, bool) {
 	return string(n), true
 }
 
-func ParseBool(s string) (bool, bool) {
+// ParseBool interprets s as a boolean value. "yes" and "true"
+// evaluate to true, while "no" and "false" evaluate to false. Other
+// values are not permitted.
+func ParseBool(s string) (v bool, ok bool) {
 	if s == "yes" || s == "no" || s == "true" || s == "false" {
 		return s == "yes" || s == "true", true
 	}
 	return false, false
 }
 
-func ParseNumber(s string) (int, bool) {
+// ParseNumber interprets s as a whole number, optionally with a sign.
+func ParseNumber(s string) (v int, ok bool) {
 	if !isNumber(s) {
 		return 0, false
 	}
@@ -181,7 +184,9 @@ func ParseNumber(s string) (int, bool) {
 	return int(n), err == nil
 }
 
-func ParseRange(s string) (Range, bool) {
+// ParseRange interprets s as a range consisting of two whole,
+// positive numbers without signs.
+func ParseRange(s string) (v Range, ok bool) {
 	parts := strings.SplitN(s, "-", 2)
 	if len(parts) != 2 || !isDigits(parts[0]) || !isDigits(parts[1]) {
 		return Range{}, false
@@ -191,7 +196,10 @@ func ParseRange(s string) (Range, bool) {
 	return Range{int(n1), int(n2)}, true
 }
 
-func ParseResolution(s string) (Resolution, bool) {
+// ParseResolution interprets s as a resolution. Valid inputs look
+// like "600dpi", "600x300dpi", "600dpc" or "600x300dpc". Resolutions
+// in dots per centimeter will be converted to dots per inch.
+func ParseResolution(s string) (v Resolution, ok bool) {
 	if len(s) < 4 {
 		return Resolution{}, false
 	}
@@ -221,7 +229,13 @@ func ParseResolution(s string) (Resolution, bool) {
 	}, true
 }
 
-func ParseDate(s string) (time.Time, bool) {
+// ParseDate interprets s as a date/time. Valid formats are:
+//   - HHmm
+//   - HHmmss
+//   - yyyyMMdd
+//   - yyyyMMddHHmm
+//   - yyyyMMddHHmmss
+func ParseDate(s string) (v time.Time, ok bool) {
 	var t time.Time
 	var err error
 	switch len(s) {
