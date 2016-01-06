@@ -6,7 +6,6 @@ import (
 	"errors"
 	"image/color"
 	"io"
-	"io/ioutil"
 )
 
 var (
@@ -150,13 +149,17 @@ func (d *Decoder) NextPage() (*Page, error) {
 }
 
 func (p *Page) discard() error {
-	n := p.UnreadLines() * int(p.LineSize())
-	r := io.LimitReader(p.dec.r, int64(n))
-	_, err := io.Copy(ioutil.Discard, r)
-	if err == io.EOF {
-		return io.ErrUnexpectedEOF
+	n := p.UnreadLines()
+	b := make([]byte, p.LineSize())
+	for i := 0; i < n; i++ {
+		if err := p.ReadLine(b); err != nil {
+			if err == io.EOF {
+				return io.ErrUnexpectedEOF
+			}
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 // ReadLine returns the next line of pixels in the image. It returns

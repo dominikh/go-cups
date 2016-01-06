@@ -111,6 +111,51 @@ func TestDecodeMultiplePages(t *testing.T) {
 			t.Errorf("got error %q reading page, want nil", err)
 		}
 	}
+	if i != 2 {
+		t.Errorf("read %d pages, want 2", i)
+	}
+}
+
+func TestDecodeSkipPage(t *testing.T) {
+	f := open("two_pages", t)
+	defer f.Close()
+	d, err := NewDecoder(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := d.NextPage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, p.LineSize())
+	if err = p.ReadLine(b); err != nil {
+		t.Fatal(err)
+	}
+	p, err = d.NextPage()
+	if err != nil {
+		t.Errorf("NextPage after a partially read page failed with %v", err)
+	}
+}
+
+func TestDecodeSkipTruncatedPage(t *testing.T) {
+	f := open("raster_truncated", t)
+	defer f.Close()
+	d, err := NewDecoder(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := d.NextPage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, p.LineSize())
+	if err = p.ReadLine(b); err != nil {
+		t.Fatal(err)
+	}
+	err = p.discard()
+	if err != io.ErrUnexpectedEOF {
+		t.Errorf("skipping over partially read truncated page returned %v, want io.ErrUnexpectedEOF", err)
+	}
 }
 
 func TestDecodeTruncatedLine(t *testing.T) {
