@@ -68,7 +68,7 @@ func TestDecode(t *testing.T) {
 			t.Errorf("%s: d.NextPage(): got err %v, want nil", tt.file, err)
 			continue
 		}
-		b := make([]byte, p.TotalSize())
+		b := make([]byte, p.Size())
 		err = p.ReadAll(b)
 		if err != nil {
 			t.Errorf("%s: p.ReadAll(): got err %v, want nil", tt.file, err)
@@ -105,7 +105,7 @@ func TestDecodeMultiplePages(t *testing.T) {
 		if err != nil {
 			t.Errorf("got error %q advancing page, want nil", err)
 		}
-		b := make([]byte, p.TotalSize())
+		b := make([]byte, p.Size())
 		err = p.ReadAll(b)
 		if err != nil {
 			t.Errorf("got error %q reading page, want nil", err)
@@ -199,7 +199,7 @@ func TestDecodeMissingLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := make([]byte, p.TotalSize())
+	b := make([]byte, p.Size())
 	err = p.ReadAll(b)
 	if err != io.ErrUnexpectedEOF {
 		t.Errorf("got %v, want io.ErrUnexpectedEOF", err)

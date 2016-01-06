@@ -20,7 +20,7 @@ var (
 	ErrUnsupported = errors.New("unsupported feature")
 
 	// ErrBufferTooSmall is returned from ReadLine and ReadAll when
-	// the buffer is smaller than Page.LineSize or Page.TotalSize
+	// the buffer is smaller than Page.LineSize or Page.Size
 	// respectively.
 	ErrBufferTooSmall = errors.New("buffer too small")
 
@@ -277,7 +277,7 @@ func (p *Page) UnreadLines() int {
 // previously, ReadAll will read the remainder of the page. It returns
 // io.EOF if the entire page has been read already.
 func (p *Page) ReadAll(b []byte) error {
-	if len(b) < int(p.LineSize())*p.UnreadLines() {
+	if len(b) < p.Size() {
 		return ErrBufferTooSmall
 	}
 	n := p.UnreadLines()

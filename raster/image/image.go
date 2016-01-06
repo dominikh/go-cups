@@ -36,7 +36,7 @@ func rect(p *raster.Page) image.Rectangle {
 // amounts of memory. For efficient, line-wise processing, a
 // combination of ReadLine and ParseColors should be used instead.
 func Image(p *raster.Page) (image.Image, error) {
-	b := make([]byte, p.TotalSize())
+	b := make([]byte, p.Size())
 	err := p.ReadAll(b)
 	if err != nil {
 		return nil, err

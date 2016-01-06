@@ -258,7 +258,7 @@ func (p *Page) LineSize() int {
 	return p.Header.CUPS.BytesPerLine
 }
 
-// TotalSize returns the size of the entire page, in bytes.
-func (p *Page) TotalSize() int {
-	return p.Header.CUPS.Height * p.Header.CUPS.BytesPerLine
+// Size returns the size of the unread portion of the page, in bytes.
+func (p *Page) Size() int {
+	return p.LineSize() * p.UnreadLines()
 }
