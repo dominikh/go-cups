@@ -183,9 +183,9 @@ type CUPSHeader struct {
 // It currently supports the following color spaces and bit depths,
 // although more might be added later:
 //
-//   - 1-bit, ColorSpaceBlack -> color.Gray
-//   - 8-bit, ColorSpaceBlack -> color.Gray
-//   - 8-bit, ColorSpaceCMYK -> color.CMYK
+// 	- 1-bit, ColorSpaceBlack -> color.Gray
+// 	- 8-bit, ColorSpaceBlack -> color.Gray
+// 	- 8-bit, ColorSpaceCMYK -> color.CMYK
 //
 // Note that b might contain data for more colors than are actually
 // present. This happens when data is stored with less than 8 bits per

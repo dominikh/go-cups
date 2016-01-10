@@ -235,11 +235,11 @@ func ParseResolution(s string) (v Resolution, ok bool) {
 }
 
 // ParseDate interprets s as a date/time. Valid formats are:
-//   - HHmm
-//   - HHmmss
-//   - yyyyMMdd
-//   - yyyyMMddHHmm
-//   - yyyyMMddHHmmss
+// 	- HHmm
+// 	- HHmmss
+// 	- yyyyMMdd
+// 	- yyyyMMddHHmm
+// 	- yyyyMMddHHmmss
 func ParseDate(s string) (v time.Time, ok bool) {
 	var t time.Time
 	var err error
