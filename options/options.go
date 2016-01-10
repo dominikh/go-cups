@@ -2,6 +2,9 @@
 // known as PAPI text attributes.
 package options
 
+// TODO(dh): don't return a boolean error, instead describe where in
+// the input the error occured
+
 import (
 	"math"
 	"strconv"
@@ -59,7 +62,10 @@ func ParseOptions(s string) (v []Option, ok bool) {
 			s = s[1:]
 		valueLoop:
 			for len(s) > 0 {
-				value, s = parseValue(s)
+				value, s, ok = parseValue(s)
+				if !ok {
+					return nil, false
+				}
 				option.Values = append(option.Values, value)
 				if len(s) > 0 {
 					if s[0] == ',' {
@@ -90,31 +96,30 @@ func ParseOptions(s string) (v []Option, ok bool) {
 	return v, true
 }
 
-func parseValue(s string) (value string, remainder string) {
+func parseValue(s string) (value string, remainder string, ok bool) {
 	s = consumeSpace(s)
 	if len(s) == 0 {
-		// TODO invalid option string, error
+		return "", "", false
 	}
 	switch s[0] {
 	case '{':
-		// TODO find closing }, return string
 		return extractCollection(s)
 	case '\'', '"':
 		v, remainder, ok := parseString(s, true)
 		if !ok {
-			// TODO bubble up failure
+			return "", "", false
 		}
-		return v, remainder
+		return v, remainder, true
 	default:
 		v, remainder, ok := parseString(s, false)
 		if !ok {
-			// TODO bubble up failure
+			return "", "", false
 		}
-		return v, remainder
+		return v, remainder, true
 	}
 }
 
-func extractCollection(s string) (value string, remainder string) {
+func extractCollection(s string) (value string, remainder string, ok bool) {
 	depth := 0
 	escape := false
 	var quote byte
@@ -131,7 +136,7 @@ loop:
 				depth--
 			}
 			if depth == 0 {
-				return s[:i+1], s[i+1:]
+				return s[:i+1], s[i+1:], true
 			}
 		case '\\':
 			if !escape {
@@ -151,7 +156,7 @@ loop:
 		}
 		escape = false
 	}
-	return s, ""
+	return s, "", false
 }
 
 func parseOctal(s string) (string, bool) {
