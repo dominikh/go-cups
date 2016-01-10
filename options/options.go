@@ -65,6 +65,18 @@ func (d *decoder) byte() byte {
 	return d.input[d.offset]
 }
 
+// ParseOptions parses CUPS text options, which are usually passed to
+// CUPS filter programs as arguments. It will return a list of
+// options, which might either be valueless boolean options ("name"
+// and "noname") or options with values ("name=value"). It works for
+// "bare" collections of options as well as actual collections, which
+// are surrounded by curly braces.
+//
+// Parsed values will always be returned as strings. Helper functions
+// such as ParseNumber and ParseRange are provided to turn these
+// strings into more useful types. Collections, too, will be returned
+// as strings. These can be parsed with additional calls to
+// ParseOptions.
 func ParseOptions(s string) (v []Option, err error) {
 	if len(s) == 0 {
 		return nil, nil
