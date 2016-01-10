@@ -421,3 +421,45 @@ func TestParseOptions(t *testing.T) {
 		}
 	}
 }
+
+func TestOptionRealName(t *testing.T) {
+	var tests = []struct {
+		in  Option
+		out string
+	}{
+		{Option{"foo", nil}, "foo"},
+		{Option{"nofoo", nil}, "foo"},
+		{Option{"nofoo", []string{"value"}}, "nofoo"},
+		{Option{"foo", []string{"value"}}, "foo"},
+	}
+
+	for i, tt := range tests {
+		name := tt.in.RealName()
+		if name != tt.out {
+			t.Errorf("%d: RealName() = %q, want %q", i, name, tt.out)
+		}
+	}
+}
+
+func TestOptionBool(t *testing.T) {
+	var tests = []struct {
+		in  Option
+		out bool
+	}{
+		{Option{"foo", nil}, true},
+		{Option{"nofoo", nil}, false},
+		{Option{"foo", []string{"false"}}, false},
+		{Option{"foo", []string{"true"}}, true},
+		{Option{"foo", []string{"true", "true"}}, false},
+		{Option{"foo", []string{"value"}}, false},
+		{Option{"nofoo", []string{"false"}}, false},
+		{Option{"nofoo", []string{"true"}}, true},
+	}
+
+	for i, tt := range tests {
+		v := tt.in.Bool()
+		if v != tt.out {
+			t.Errorf("%d: Bool() = %t, want %t", i, v, tt.out)
+		}
+	}
+}

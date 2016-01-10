@@ -33,6 +33,37 @@ type Option struct {
 	Values []string
 }
 
+// RealName returns the option's real name. If the option has at least
+// one value, the real name is identical to the option name. If the
+// option has no values, and thus is a boolean option, the real name
+// equals the option's name, but with any "no" prefix removed.
+func (o Option) RealName() string {
+	if len(o.Values) > 0 {
+		return o.Name
+	}
+	if len(o.Name) < 3 || o.Name[0:2] != "no" {
+		return o.Name
+	}
+	return o.Name[2:]
+}
+
+// Bool reports the boolean value of the option. If the option has no
+// value, Bool will report true if the option name does not begin with
+// "no", false otherwise. If the option has a single value, it will be
+// parsed as a boolean. See ParseBoolean for the specifics on the
+// parsing of booleans. If the option has more than one value, Bool
+// will report false.
+func (o Option) Bool() bool {
+	if len(o.Values) == 0 {
+		return len(o.Name) < 3 || o.Name[0:2] != "no"
+	}
+	if len(o.Values) == 1 {
+		b, _ := ParseBool(o.Values[0])
+		return b
+	}
+	return false
+}
+
 type SyntaxError struct {
 	Offset int
 	msg    string
