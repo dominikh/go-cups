@@ -33,54 +33,86 @@ type Option struct {
 	Values []string
 }
 
-func ParseOptions(s string) (v []Option, ok bool) {
+type SyntaxError struct {
+	Offset int
+	msg    string
+}
+
+func (err *SyntaxError) Error() string {
+	return err.msg
+}
+
+type decoder struct {
+	input  string
+	offset int
+}
+
+func (d *decoder) eof() bool {
+	return d.offset >= len(d.input)
+}
+
+func (d *decoder) string() string {
+	if d.eof() {
+		return ""
+	}
+	return d.input[d.offset:]
+}
+
+func (d *decoder) byte() byte {
+	if d.eof() {
+		return 0
+	}
+	return d.input[d.offset]
+}
+
+func ParseOptions(s string) (v []Option, err error) {
 	if len(s) == 0 {
-		return nil, true
+		return nil, nil
 	}
 	if len(s) >= 2 && s[0] == '{' && s[len(s)-1] == '}' {
 		s = s[1 : len(s)-1]
 	}
+	d := &decoder{input: s}
 	var option Option
-	for len(s) > 0 {
+	for !d.eof() {
 		if option.Name != "" {
 			v = append(v, option)
 			option = Option{}
 		}
-		var name string
-		name, s = parseName(s)
+		name := d.parseName()
 		if name == "" {
 			break
 		}
 		option.Name = name
-		s = consumeSpace(s)
-		if len(s) == 0 {
+		d.consumeSpace()
+		if d.eof() {
 			break
 		}
-		if s[0] == '=' {
+		if d.byte() == '=' {
 			// this is a value option
+			d.offset++
 			var value string
-			s = s[1:]
 		valueLoop:
-			for len(s) > 0 {
-				value, s, ok = parseValue(s)
-				if !ok {
-					return nil, false
+			for !d.eof() {
+				value, err = d.parseValue()
+				if err != nil {
+					return nil, err
 				}
 				option.Values = append(option.Values, value)
-				if len(s) > 0 {
-					if s[0] == ',' {
-						if len(s) == 1 {
-							return nil, false
+				if !d.eof() {
+					if d.byte() == ',' {
+						if len(d.string()) == 1 {
+							return nil, &SyntaxError{d.offset, "unexpected end of input"}
 						}
-						s = s[1:]
-					} else if s[0] == ' ' {
+						d.offset++
+					} else if d.byte() == ' ' {
 						break valueLoop
 					}
 				}
 			}
 			if len(option.Values) == 0 {
 				// saw an equal sign but no value -> invalid
-				return nil, false
+				return nil, &SyntaxError{d.offset, "unexpected end of input"}
 			}
 		} else {
 			if option.Name != "" {
@@ -93,39 +125,40 @@ func ParseOptions(s string) (v []Option, ok bool) {
 		v = append(v, option)
 		option = Option{}
 	}
-	return v, true
+	return v, nil
 }
 
-func parseValue(s string) (value string, remainder string, ok bool) {
-	s = consumeSpace(s)
-	if len(s) == 0 {
-		return "", "", false
+func (d *decoder) parseValue() (value string, err error) {
+	d.consumeSpace()
+	if d.eof() {
+		return "", &SyntaxError{d.offset, "unexpected end of input"}
 	}
-	switch s[0] {
+	switch d.byte() {
 	case '{':
-		return extractCollection(s)
+		return d.extractCollection()
 	case '\'', '"':
-		v, remainder, ok := parseString(s, true)
-		if !ok {
-			return "", "", false
+		v, err := d.parseString(true)
+		if err != nil {
+			return "", err
 		}
-		return v, remainder, true
+		return v, nil
 	default:
-		v, remainder, ok := parseString(s, false)
-		if !ok {
-			return "", "", false
+		v, err := d.parseString(false)
+		if err != nil {
+			return "", err
 		}
-		return v, remainder, true
+		return v, nil
 	}
 }
 
-func extractCollection(s string) (value string, remainder string, ok bool) {
+func (d *decoder) extractCollection() (string, error) {
 	depth := 0
 	escape := false
 	var quote byte
+	start := d.offset
 loop:
-	for i := 0; i < len(s); i++ {
-		c := s[i]
+	for ; !d.eof(); d.offset++ {
+		c := d.byte()
 		switch c {
 		case '{':
 			if !escape && quote == 0 {
@@ -136,7 +169,8 @@ loop:
 				depth--
 			}
 			if depth == 0 {
-				return s[:i+1], s[i+1:], true
+				d.offset++
+				return d.input[start:d.offset], nil
 			}
 		case '\\':
 			if !escape {
@@ -156,18 +190,18 @@ loop:
 		}
 		escape = false
 	}
-	return s, "", false
+	return "", &SyntaxError{d.offset, "unexpected end of input"}
 }
 
-func parseOctal(s string) (string, bool) {
+func (d *decoder) parseOctal(s string) (string, error) {
 	if len(s) != 3 {
-		return "", false
+		return "", &SyntaxError{d.offset, "invalid octal number"}
 	}
 	n, err := strconv.ParseInt(s, 8, 32)
 	if err != nil {
-		return "", false
+		return "", &SyntaxError{d.offset, err.Error()}
 	}
-	return string(n), true
+	return string(n), nil
 }
 
 // ParseBool interprets s as a boolean value. "yes" and "true"
@@ -290,12 +324,12 @@ func isDigits(s string) bool {
 	return true
 }
 
-func parseString(s string, quoted bool) (match string, remainder string, ok bool) {
-	if len(s) == 0 {
-		return "", "", false
+func (d *decoder) parseString(quoted bool) (string, error) {
+	if d.eof() {
+		return "", &SyntaxError{d.offset, "unexpected end of input"}
 	}
-	if quoted && len(s) < 2 {
-		return "", "", false
+	if quoted && len(d.string()) < 2 {
+		return "", &SyntaxError{d.offset, "unexpected end of input"}
 	}
 	var i int
 	var v string
@@ -303,20 +337,20 @@ func parseString(s string, quoted bool) (match string, remainder string, ok bool
 	var octal string
 	var open byte
 	if quoted {
-		open = s[0]
-		s = s[1:]
+		open = d.byte()
+		d.offset++
 		if open != '"' && open != '\'' {
-			return "", "", false
+			return "", &SyntaxError{d.offset, "improperly quoted string"}
 		}
 	}
 loop:
-	for i = 0; i < len(s); i++ {
-		c := s[i]
+	for ; !d.eof(); d.offset++ {
+		c := d.byte()
 		if octal != "" && (c < '0' || c > '7' || len(octal) == 3) {
 			escape = false
-			n, ok := parseOctal(octal)
-			if !ok {
-				return "", "", false
+			n, err := d.parseOctal(octal)
+			if err != nil {
+				return "", err
 			}
 			v += n
 			octal = ""
@@ -336,7 +370,7 @@ loop:
 				}
 				if !quoted {
 					// unquoted string, unescaped quote -> invalid
-					return "", "", false
+					return "", &SyntaxError{d.offset, "unescaped quote in unquoted string"}
 				}
 			}
 			v += string(c)
@@ -371,43 +405,48 @@ loop:
 
 				v += string(c)
 			} else {
-				return "", "", false
+				return "", &SyntaxError{d.offset, "invalid byte in string"}
 			}
 		}
 		escape = false
 	}
-	if quoted && i >= len(s) {
+	if quoted && d.eof() {
 		// didn't see a closing quote
-		return "", "", false
+		return "", &SyntaxError{d.offset, "unexpected end of input"}
+	}
+	if quoted {
+		d.offset++
 	}
 	if octal != "" {
-		n, ok := parseOctal(octal)
-		if !ok {
-			return "", "", false
+		n, err := d.parseOctal(octal)
+		if err != nil {
+			return "", err
 		}
 		v += n
 	}
-	if i == len(s) {
-		return v, "", true
-	}
-	return v, s[i+1:], true
+	return v, nil
 }
 
-func parseName(s string) (match string, remainder string) {
-	s = consumeSpace(s)
-	var i int
-	for i = 0; i < len(s); i++ {
-		if unicode.IsSpace(rune(s[i])) || s[i] == '=' {
+func (d *decoder) parseName() string {
+	d.consumeSpace()
+	start := d.offset
+	for ; !d.eof(); d.offset++ {
+		c := d.byte()
+		if unicode.IsSpace(rune(c)) || c == '=' {
 			break
 		}
 	}
-	return s[:i], s[i:]
+	return d.input[start:d.offset]
 }
 
-func consumeSpace(s string) (remainder string) {
-	idx := strings.IndexFunc(s, func(r rune) bool { return !unicode.IsSpace(r) })
-	if idx == -1 {
-		idx = len(s)
+func (d *decoder) consumeSpace() {
+	if d.eof() {
+		return
 	}
-	return s[idx:]
+	idx := strings.IndexFunc(d.string(), func(r rune) bool { return !unicode.IsSpace(r) })
+	if idx == -1 {
+		d.offset = len(d.input)
+	} else {
+		d.offset += idx
+	}
 }
