@@ -132,22 +132,20 @@ func ParseOptions(s string) (v []Option, err error) {
 			// this is a value option
 			d.offset++
 			var value string
-		valueLoop:
 			for !d.eof() {
 				value, err = d.parseValue()
 				if err != nil {
 					return nil, err
 				}
 				option.Values = append(option.Values, value)
-				if !d.eof() {
-					if d.byte() == ',' {
-						if len(d.string()) == 1 {
-							return nil, &SyntaxError{d.offset, "unexpected end of input"}
-						}
-						d.offset++
-					} else if d.byte() == ' ' {
-						break valueLoop
+				if d.eof() || d.byte() == ' ' {
+					break
+				}
+				if d.byte() == ',' {
+					if len(d.string()) == 1 {
+						return nil, &SyntaxError{d.offset, "unexpected end of input"}
 					}
+					d.offset++
 				}
 			}
 			if len(option.Values) == 0 {
