@@ -2,9 +2,6 @@
 // known as PAPI text attributes.
 package options
 
-// TODO(dh): don't return a boolean error, instead describe where in
-// the input the error occured
-
 import (
 	"math"
 	"strconv"
