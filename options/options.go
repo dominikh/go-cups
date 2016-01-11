@@ -242,6 +242,7 @@ func (d *decoder) parseOctal(s string) (string, error) {
 	}
 	n, err := strconv.ParseInt(s, 8, 32)
 	if err != nil {
+		// this shouldn't be possible
 		return "", &SyntaxError{d.offset, err.Error()}
 	}
 	return string(n), nil

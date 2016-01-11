@@ -83,6 +83,7 @@ func TestParseString(t *testing.T) {
 		{`"test`, ``, ``, true, &SyntaxError{Offset: 5, msg: "unexpected end of input"}},
 		{``, ``, ``, true, &SyntaxError{Offset: 0, msg: "unexpected end of input"}},
 		{`"\27"`, ``, ``, true, &SyntaxError{Offset: 4, msg: "invalid octal number"}},
+		{`\27`, ``, ``, false, &SyntaxError{Offset: 3, msg: "invalid octal number"}},
 		{"'\x00'", ``, ``, true, &SyntaxError{Offset: 1, msg: "invalid byte in string"}},
 		{`"`, ``, ``, true, &SyntaxError{Offset: 0, msg: "unexpected end of input"}},
 
@@ -406,6 +407,27 @@ func TestParseOptions(t *testing.T) {
 			`field={foo="b\"ar}"}`,
 			[]Option{{"field", []string{`{foo="b\"ar}"}`}}},
 			nil,
+		},
+
+		{
+			`field=  `,
+			nil,
+			&SyntaxError{Offset: 8, msg: "unexpected end of input"},
+		},
+		{
+			`field={`,
+			nil,
+			&SyntaxError{Offset: 7, msg: "unexpected end of input"},
+		},
+		{
+			`field="`,
+			nil,
+			&SyntaxError{Offset: 6, msg: "unexpected end of input"},
+		},
+		{
+			`field=\23`,
+			nil,
+			&SyntaxError{Offset: 9, msg: "invalid octal number"},
 		},
 
 		// go-fuzz tests
