@@ -429,6 +429,11 @@ func TestParseOptions(t *testing.T) {
 			nil,
 			&SyntaxError{Offset: 9, msg: "invalid octal number"},
 		},
+		{
+			`field=,`,
+			nil,
+			&SyntaxError{Offset: 6, msg: "unexpected end of input"},
+		},
 
 		// go-fuzz tests
 		{"foo=value1,", nil, &SyntaxError{Offset: 10, msg: "unexpected end of input"}},

@@ -142,10 +142,10 @@ func ParseOptions(s string) (v []Option, err error) {
 					break
 				}
 				if d.byte() == ',' {
-					if len(d.string()) == 1 {
+					d.offset++
+					if d.eof() {
 						return nil, &SyntaxError{d.offset, "unexpected end of input"}
 					}
-					d.offset++
 				}
 			}
 			if len(option.Values) == 0 {
